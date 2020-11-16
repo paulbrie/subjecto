@@ -1,0 +1,22 @@
+{
+  "name": "subjecto",
+  "version": "0.0.6",
+  "description": "A minimalistic state management library",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/paulbrie/subjecto"
+  },
+  "keywords": [
+    "state",
+    "management",
+    "subscribe",
+    "data",
+    "store"
+  ],
+  "author": "Paul Brie",
+  "license": "MIT"
+}
