@@ -7,7 +7,7 @@ It is composed of a standalone observer called "subject" and of a state store co
 
 ## API
 
-```
+```javascript
 import { subject } from "subjecto";
 
 // init
