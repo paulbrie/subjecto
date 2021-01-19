@@ -8,6 +8,7 @@ export type SubscriptionHandle = {
 interface Subject<T> {
   name: string;
   next: (nextValue: T) => void;
+  nextAssign: (nextValue: T) => void;
   subscribe: (subscription: Subscription<T>) => SubscriptionHandle;
   unsubscribe: (subscriptionId: string) => void;
   value: T;
@@ -42,6 +43,14 @@ Subject.prototype.next = function (nextValue: any) {
       this
     );
     console.log(" └ Stack:");
+  }
+};
+
+Subject.prototype.nextAssign = function (newValue: any) {
+  try {
+    this.next(Object.assign(this.value, newValue));
+  } catch (error) {
+    this.next(newValue);
   }
 };
 

@@ -27,6 +27,14 @@ Subject.prototype.next = function (nextValue) {
         console.log(" └ Stack:");
     }
 };
+Subject.prototype.nextAssign = function (newValue) {
+    try {
+        this.next(Object.assign(this.value, newValue));
+    }
+    catch (error) {
+        this.next(newValue);
+    }
+};
 Subject.prototype.subscribe = function (subscription) {
     var _this = this;
     var subscriptionExistsAtIndex = Object.values(this.subscribers).indexOf(subscription);
