@@ -1,12 +1,11 @@
 {
   "name": "subjecto",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "A minimalistic state management library",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsc --watch",
-    "build": "tsc",
-    "prepare": "npm run build"
+    "build": "tsc"
   },
   "repository": {
     "type": "git",

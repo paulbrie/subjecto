@@ -7,6 +7,7 @@ interface Subject<T> {
     name: string;
     next: (nextValue: T) => void;
     nextAssign: (nextValue: T) => void;
+    nextPush: (nextValue: T) => void;
     subscribe: (subscription: Subscription<T>) => SubscriptionHandle;
     unsubscribe: (subscriptionId: string) => void;
     value: T;
