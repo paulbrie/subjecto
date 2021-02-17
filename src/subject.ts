@@ -19,6 +19,7 @@ interface Subject<T> {
   subscribersCount: () => number;
   complete: () => void;
   debug: boolean;
+  hook: (nextValue?: T) => T;
 }
 
 class Subject<T> {
@@ -30,7 +31,7 @@ class Subject<T> {
   }
 }
 
-Subject.prototype.next = function (nextValue: any) {
+Subject.prototype.next = function (nextValue: typeof Subject.prototype.value) {
   this.value = nextValue;
   Object.keys(this.subscribers).forEach((key) => {
     if (this.subscribers[key]) {
@@ -47,7 +48,9 @@ Subject.prototype.next = function (nextValue: any) {
   }
 };
 
-Subject.prototype.nextAssign = function (newValue: any) {
+Subject.prototype.nextAssign = function (
+  newValue: typeof Subject.prototype.value
+) {
   try {
     this.next(Object.assign(this.value, newValue));
   } catch (error) {
@@ -55,7 +58,7 @@ Subject.prototype.nextAssign = function (newValue: any) {
   }
 };
 
-Subject.prototype.nextPush = function (value: any) {
+Subject.prototype.nextPush = function (value: typeof Subject.prototype.value) {
   if (Array.isArray(this.value)) {
     this.next([...this.value, value]);
   }
@@ -108,6 +111,19 @@ Subject.prototype.unsubscribe = function (id) {
 
 Subject.prototype.complete = function () {
   Object.keys(this.subscribers).forEach((key) => this.unsubscribe(key));
+};
+
+/**
+ * The hook function is a placeholder/template function "slot" meant to be overriden.
+ * For example, it could be used to attach a React hook to this subject.
+ */
+Subject.prototype.hook = function (
+  defaultValue?: typeof Subject.prototype.value
+) {
+  if (defaultValue) {
+    this.next(defaultValue);
+  }
+  return this.value;
 };
 
 export default Subject;

@@ -17,6 +17,7 @@ interface Subject<T> {
     subscribersCount: () => number;
     complete: () => void;
     debug: boolean;
+    hook: () => T;
 }
 declare class Subject<T> {
     constructor(initialValue: T, name?: string);
