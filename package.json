@@ -1,6 +1,6 @@
 {
   "name": "subjecto",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "A minimalistic state management library",
   "main": "dist/index.js",
   "scripts": {

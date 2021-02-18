@@ -6,7 +6,7 @@ export declare type SubscriptionHandle = {
 interface Subject<T> {
     name: string;
     next: (nextValue: T) => void;
-    once: (nextValue: T) => void;
+    once: (subscription: Subscription<T>) => void;
     nextAssign: (nextValue: T) => void;
     nextPush: (nextValue: T) => void;
     subscribe: (subscription: Subscription<T>) => SubscriptionHandle;
