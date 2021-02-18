@@ -6,6 +6,7 @@ export declare type SubscriptionHandle = {
 interface Subject<T> {
     name: string;
     next: (nextValue: T) => void;
+    once: (nextValue: T) => void;
     nextAssign: (nextValue: T) => void;
     nextPush: (nextValue: T) => void;
     subscribe: (subscription: Subscription<T>) => SubscriptionHandle;
@@ -17,7 +18,7 @@ interface Subject<T> {
     subscribersCount: () => number;
     complete: () => void;
     debug: boolean;
-    hook: () => T;
+    hook: (nextValue?: T) => T;
 }
 declare class Subject<T> {
     constructor(initialValue: T, name?: string);

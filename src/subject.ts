@@ -8,6 +8,7 @@ export type SubscriptionHandle = {
 interface Subject<T> {
   name: string;
   next: (nextValue: T) => void;
+  once: (nextValue: T) => void;
   nextAssign: (nextValue: T) => void;
   nextPush: (nextValue: T) => void;
   subscribe: (subscription: Subscription<T>) => SubscriptionHandle;
@@ -111,6 +112,13 @@ Subject.prototype.unsubscribe = function (id) {
 
 Subject.prototype.complete = function () {
   Object.keys(this.subscribers).forEach((key) => this.unsubscribe(key));
+};
+
+Subject.prototype.once = function <T>(subscription: Subscription<T>): void {
+  const handler = (this as Subject<T>).subscribe((value: T) => {
+    subscription(value);
+    handler.unsubscribe();
+  });
 };
 
 /**

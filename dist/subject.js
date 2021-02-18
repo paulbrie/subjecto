@@ -79,6 +79,12 @@ Subject.prototype.complete = function () {
     var _this = this;
     Object.keys(this.subscribers).forEach(function (key) { return _this.unsubscribe(key); });
 };
+Subject.prototype.once = function (subscription) {
+    var handler = this.subscribe(function (value) {
+        subscription(value);
+        handler.unsubscribe();
+    });
+};
 /**
  * The hook function is a placeholder/template function "slot" meant to be overriden.
  * For example, it could be used to attach a React hook to this subject.
