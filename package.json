@@ -10,7 +10,7 @@
   },
   "jest": {
     "preset": "ts-jest",
-    "testEnvironment": "node",
+    "testEnvironment": "node"
   },
   "repository": {
     "type": "git",
