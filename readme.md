@@ -1,5 +1,7 @@
 [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/paulbrie/subjecto)
 
+[![CircleCI](https://circleci.com/gh/paulbrie/subjecto.svg?style=shield)](https://circleci.com/gh/paulbrie/subjecto)
+
 # Subjecto
 
 ## What is it?
