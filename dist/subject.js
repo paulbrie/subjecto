@@ -17,21 +17,29 @@ var Subject = /** @class */ (function () {
         this.subscribers = {};
         this.name = name || "noName";
         this.debug = false;
+        this.before = function (nextValue) { return nextValue; };
     }
     return Subject;
 }());
 Subject.prototype.next = function (nextValue) {
     var _this = this;
-    this.value = nextValue;
+    this.value = this.before(nextValue);
     Object.keys(this.subscribers).forEach(function (key) {
         if (_this.subscribers[key]) {
             _this.subscribers[key](_this.value);
         }
     });
     if (this.debug) {
-        console.log(" \u251C nextValue:", nextValue);
-        console.log(" \u251C subscribers(" + Object.keys(this.subscribers).length + "): ", this);
-        console.log(" └ Stack:");
+        if (typeof this.debug === 'function') {
+            this.debug(nextValue);
+            console.log('------');
+        }
+        else {
+            console.log("else");
+            console.log(" \u251C nextValue:", nextValue);
+            console.log(" \u251C subscribers(" + Object.keys(this.subscribers).length + "): ", this);
+            console.log(" └ Stack:");
+        }
     }
 };
 Subject.prototype.nextAssign = function (newValue) {
@@ -72,9 +80,16 @@ Subject.prototype.subscribe = function (subscription) {
         id: id,
     };
 };
+/**
+ * Unsubscribes the listener from the subject
+ * @param id
+ */
 Subject.prototype.unsubscribe = function (id) {
     delete this.subscribers[id];
 };
+/**
+ * Unsubscribes all current listeners
+ */
 Subject.prototype.complete = function () {
     var _this = this;
     Object.keys(this.subscribers).forEach(function (key) { return _this.unsubscribe(key); });
