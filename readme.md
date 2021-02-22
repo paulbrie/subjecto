@@ -4,8 +4,7 @@
 
 ## What is it?
 
-Subjecto is a minimal state management library.
-It is composed of a standalone observer called "subject" and of a state store composer (coming soon)
+Subjecto is a minimalistic state management library with no dependencies. Its API is inspired from RxJs' Subject.
 
 ## API
 
@@ -13,15 +12,15 @@ It is composed of a standalone observer called "subject" and of a state store co
 import { subject } from "subjecto";
 
 // init
-const value = new subject("", "my subject");
-
-// debug
-value.debug = true;
+const value = new subject(new Date().toISOString())
 
 // subscribe
 const handler = value.subscribe((newValue) => {
   console.log("subscription 1", newValue);
 });
+
+// optionally, set debug to true to see all listeners and value updates
+value.debug = true;
 
 // push a new value
 value.next(new Date().toISOString());

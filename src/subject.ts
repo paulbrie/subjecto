@@ -6,6 +6,7 @@ export type SubscriptionHandle = {
 };
 
 interface Subject<T> {
+  before: (nextValue: T) => T;
   name: string;
   next: (nextValue: T) => void;
   nextAssign: (nextValue: T) => void;
@@ -18,7 +19,7 @@ interface Subject<T> {
   };
   subscribersCount: () => number;
   complete: () => void;
-  debug: boolean;
+  debug: ((subject: Subject<T>) => void) | boolean;
   hook: (nextValue?: T) => T;
 }
 
@@ -28,23 +29,29 @@ class Subject<T> {
     this.subscribers = {};
     this.name = name || "noName";
     this.debug = false;
+    this.before = (nextValue) => nextValue
   }
 }
 
-Subject.prototype.next = function (nextValue: typeof Subject.prototype.value) {
-  this.value = nextValue;
+Subject.prototype.next = function (nextValue) {
+  this.value = this.before(nextValue);
   Object.keys(this.subscribers).forEach((key) => {
     if (this.subscribers[key]) {
       this.subscribers[key](this.value);
     }
   });
   if (this.debug) {
-    console.log(` ├ nextValue:`, nextValue);
-    console.log(
+    if (typeof this.debug === 'function') {
+        this.debug(nextValue)
+        console.log('------')
+    } else {
+      console.log("else")
+      console.log(` ├ nextValue:`, nextValue);
+      console.log(
       ` ├ subscribers(${Object.keys(this.subscribers).length}): `,
-      this
-    );
-    console.log(" └ Stack:");
+      this);
+      console.log(" └ Stack:");
+    }
   }
 };
 
@@ -105,10 +112,17 @@ Subject.prototype.subscribe = function <T>(
   };
 };
 
+/**
+ * Unsubscribes the listener from the subject
+ * @param id
+ */
 Subject.prototype.unsubscribe = function (id) {
   delete this.subscribers[id];
 };
 
+/**
+ * Unsubscribes all current listeners
+ */
 Subject.prototype.complete = function () {
   Object.keys(this.subscribers).forEach((key) => this.unsubscribe(key));
 };
