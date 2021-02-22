@@ -1,7 +1,7 @@
-import { Subject } from "../index"
+import { Subject } from "../index";
 
 // init
-const value = new Subject(new Date().toISOString())
+const value = new Subject(new Date().toISOString());
 
 // subscribe
 // each subscription returns a handler with a unique id and an unsubscription method
@@ -11,14 +11,14 @@ const handler = value.subscribe((newValue) => {
 
 // optionally, set debug to true to see all listeners and value updates
 value.debug = (nextValue) => {
-  console.log(nextValue, value.value)
-}
+  console.log(nextValue, value.value);
+};
 
 // inspect or prepare the value before it is updated in the subject
 value.before = (nextValue) => {
-    console.log('--- before:', nextValue)
-    return nextValue
-}
+  console.log("--- before:", nextValue);
+  return nextValue;
+};
 
 // push a new value
 value.next(new Date().toISOString());
@@ -27,7 +27,7 @@ value.next(new Date().toISOString());
 console.log(handler.id);
 
 // unsubscribe
-handler.unsubscribe()
+handler.unsubscribe();
 
 // flush all subscriptions
 value.complete();

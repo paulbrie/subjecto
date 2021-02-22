@@ -22,7 +22,29 @@ test('handler format is correct', () => {
     expect(typeof handler.unsubscribe === "function")
 })
 
+test('hook is working', () => {
+    expect(testSubject.hook() === testSubject.value)
+})
+
 handler.unsubscribe()
 test('unsubscription is successful', () => {
    expect(Object.keys(testSubject.subscribers).length === 0)
+})
+
+const testSubjectAssign = new Subject<null | { a: number, b: number }>(null)
+
+testSubjectAssign.nextAssign({ a: 1, b: 1})
+test('nextAssign new object value', () => {
+   expect(testSubjectAssign.value === { a: 1, b: 1 })
+})
+
+testSubjectAssign.nextAssign({ a: 2 })
+test('nextAssign update', () => {
+   expect(testSubjectAssign.value === { a: 2, b: 1 })
+})
+
+const testSubjectPush = new Subject(['a'])
+testSubjectPush.nextPush('b')
+test('nextPush update', () => {
+   expect(testSubjectPush.value === ['a','b'])
 })

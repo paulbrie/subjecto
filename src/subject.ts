@@ -9,8 +9,8 @@ interface Subject<T> {
   before: (nextValue: T) => T;
   name: string;
   next: (nextValue: T) => void;
-  nextAssign: (nextValue: T) => void;
-  nextPush: (nextValue: T) => void;
+  nextAssign: (nextValue: Partial<T>) => void;
+  nextPush: (nextValue: any) => void;
   subscribe: (subscription: Subscription<T>) => SubscriptionHandle;
   unsubscribe: (subscriptionId: string) => void;
   value: T;
@@ -29,7 +29,7 @@ class Subject<T> {
     this.subscribers = {};
     this.name = name || "noName";
     this.debug = false;
-    this.before = (nextValue) => nextValue
+    this.before = (nextValue) => nextValue;
   }
 }
 
@@ -41,23 +41,22 @@ Subject.prototype.next = function (nextValue) {
     }
   });
   if (this.debug) {
-    if (typeof this.debug === 'function') {
-        this.debug(nextValue)
-        console.log('------')
+    if (typeof this.debug === "function") {
+      this.debug(nextValue);
+      console.log("------");
     } else {
-      console.log("else")
+      console.log("else");
       console.log(` ├ nextValue:`, nextValue);
       console.log(
-      ` ├ subscribers(${Object.keys(this.subscribers).length}): `,
-      this);
+        ` ├ subscribers(${Object.keys(this.subscribers).length}): `,
+        this
+      );
       console.log(" └ Stack:");
     }
   }
 };
 
-Subject.prototype.nextAssign = function (
-  newValue: typeof Subject.prototype.value
-) {
+Subject.prototype.nextAssign = function (newValue) {
   try {
     this.next(Object.assign(this.value, newValue));
   } catch (error) {
@@ -132,7 +131,7 @@ Subject.prototype.complete = function () {
  * For example, it could be used to attach a React hook to this subject.
  */
 Subject.prototype.hook = function (
-  defaultValue?: typeof Subject.prototype.value
+  defaultValue
 ) {
   if (defaultValue) {
     this.next(defaultValue);
