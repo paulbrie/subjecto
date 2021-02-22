@@ -11,7 +11,7 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "testPathIgnorePatterns": ["**/*.d.ts$"]
+    "testPathIgnorePatterns": ["*.d.ts$"]
   },
   "repository": {
     "type": "git",
