@@ -6,11 +6,12 @@ export type SubscriptionHandle = {
 };
 
 interface Subject<T> {
+  before: (nextValue: T) => T;
   name: string;
   next: (nextValue: T) => void;
   once: (subscription: Subscription<T>) => void;
-  nextAssign: (nextValue: T) => void;
-  nextPush: (nextValue: T) => void;
+  nextAssign: (nextValue: Partial<T>) => void;
+  nextPush: (nextValue: any) => void;
   subscribe: (subscription: Subscription<T>) => SubscriptionHandle;
   unsubscribe: (subscriptionId: string) => void;
   value: T;
@@ -19,7 +20,7 @@ interface Subject<T> {
   };
   subscribersCount: () => number;
   complete: () => void;
-  debug: boolean;
+  debug: ((subject: Subject<T>) => void) | boolean;
   hook: (nextValue?: T) => T;
 }
 
@@ -29,29 +30,34 @@ class Subject<T> {
     this.subscribers = {};
     this.name = name || "noName";
     this.debug = false;
+    this.before = (nextValue) => nextValue;
   }
 }
 
-Subject.prototype.next = function (nextValue: typeof Subject.prototype.value) {
-  this.value = nextValue;
+Subject.prototype.next = function (nextValue) {
+  this.value = this.before(nextValue);
   Object.keys(this.subscribers).forEach((key) => {
     if (this.subscribers[key]) {
       this.subscribers[key](this.value);
     }
   });
   if (this.debug) {
-    console.log(` ├ nextValue:`, nextValue);
-    console.log(
-      ` ├ subscribers(${Object.keys(this.subscribers).length}): `,
-      this
-    );
-    console.log(" └ Stack:");
+    if (typeof this.debug === "function") {
+      this.debug(nextValue);
+      console.log("------");
+    } else {
+      console.log("else");
+      console.log(` ├ nextValue:`, nextValue);
+      console.log(
+        ` ├ subscribers(${Object.keys(this.subscribers).length}): `,
+        this
+      );
+      console.log(" └ Stack:");
+    }
   }
 };
 
-Subject.prototype.nextAssign = function (
-  newValue: typeof Subject.prototype.value
-) {
+Subject.prototype.nextAssign = function (newValue) {
   try {
     this.next(Object.assign(this.value, newValue));
   } catch (error) {
@@ -106,10 +112,17 @@ Subject.prototype.subscribe = function <T>(
   };
 };
 
+/**
+ * Unsubscribes the listener from the subject
+ * @param id
+ */
 Subject.prototype.unsubscribe = function (id) {
   delete this.subscribers[id];
 };
 
+/**
+ * Unsubscribes all current listeners
+ */
 Subject.prototype.complete = function () {
   Object.keys(this.subscribers).forEach((key) => this.unsubscribe(key));
 };
@@ -125,9 +138,7 @@ Subject.prototype.once = function <T>(subscription: Subscription<T>): void {
  * The hook function is a placeholder/template function "slot" meant to be overriden.
  * For example, it could be used to attach a React hook to this subject.
  */
-Subject.prototype.hook = function (
-  defaultValue?: typeof Subject.prototype.value
-) {
+Subject.prototype.hook = function (defaultValue) {
   if (defaultValue) {
     this.next(defaultValue);
   }
