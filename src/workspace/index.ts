@@ -1,0 +1,54 @@
+//  API
+import { Subject } from "..";
+
+// ---------- Example 1 ----------
+// init
+const value1 = new Subject(new Date().toISOString());
+
+// optionally, you can inspect all subscriptions and value changes
+value1.debug = true;
+
+// subscribe to changes
+const handler1 = value1.subscribe((newValue: string) => {
+  console.log("example 1:", newValue);
+});
+
+// get handlers uid
+console.log(handler1.id);
+
+// push a new value
+value1.next(new Date().toISOString());
+
+// unsubscribe
+handler1.unsubscribe();
+
+// flush all subscriptions
+value1.complete();
+
+// ---------- Example 2 ----------
+// init
+const value2 = new Subject({ a: 1, b: 2 });
+
+// subscribe
+value2.subscribe((value) => console.log("example 2:", value));
+
+// update using Object.assign in the background
+value2.nextAssign({ a: 2 });
+
+// ---------- Example 3 ----------
+// init
+const value3 = new Subject(["a"]);
+
+// subscribe
+value3.subscribe((value) => console.log("example 3:", value));
+
+// update using Array.push in the background
+value3.nextPush('b');
+
+// ---------- Example 4: custom debug function ----------
+value3.debug = function(nextValue) {
+    console.log('incoming value is:', nextValue)
+    console.log('updated value:', this.value)
+}
+
+value3.nextPush("c")

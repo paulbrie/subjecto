@@ -20,7 +20,7 @@ interface Subject<T> {
   };
   subscribersCount: () => number;
   complete: () => void;
-  debug: ((subject: Subject<T>) => void) | boolean;
+  debug: ((nextValue: T) => void) | boolean;
   hook: (nextValue?: T) => T;
 }
 
@@ -44,15 +44,14 @@ Subject.prototype.next = function (nextValue) {
   if (this.debug) {
     if (typeof this.debug === "function") {
       this.debug(nextValue);
-      console.log("------");
     } else {
-      console.log("else");
+      console.log(`\n--- SUBJECTO DEBUG: \`${this.name}\` ---`)
       console.log(` ├ nextValue:`, nextValue);
       console.log(
-        ` ├ subscribers(${Object.keys(this.subscribers).length}): `,
-        this
+        ` └ subscribers(${Object.keys(this.subscribers).length}): `,
+        this,
+        '\n'
       );
-      console.log(" └ Stack:");
     }
   }
 };
@@ -101,9 +100,9 @@ Subject.prototype.subscribe = function <T>(
       this.unsubscribe(id);
       if (this.debug) {
         log(
-          `${this.name} has  ${
+          `Subject \`${this.name}\` has \`${
             Object.keys(this.subscribers).length
-          }  subscribers left`,
+          }\` subscribers left.`,
           "debug"
         );
       }
