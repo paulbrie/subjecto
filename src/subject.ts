@@ -8,7 +8,7 @@ export type SubscriptionHandle = {
 interface Subject<T> {
   before: (nextValue: T) => T;
   name: string;
-  next: (nextValue: T) => void;
+  next: (nextValue: T|{ (prevValue:T):T }) => void;
   once: (subscription: Subscription<T>) => void;
   nextAssign: (nextValue: Partial<T>) => void;
   nextPush: (nextValue: any) => void;
@@ -35,7 +35,8 @@ class Subject<T> {
 }
 
 Subject.prototype.next = function (nextValue) {
-  this.value = this.before(nextValue);
+  this.value = this.before(typeof nextValue === 'function' ? nextValue(this.value): nextValue);
+
   Object.keys(this.subscribers).forEach((key) => {
     if (this.subscribers[key]) {
       this.subscribers[key](this.value);

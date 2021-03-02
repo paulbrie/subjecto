@@ -25,7 +25,7 @@ handler1.unsubscribe();
 // flush all subscriptions
 value1.complete();
 
-// ---------- Example 2 ----------
+console.log('\n----- Example 2 ----- nextAssign')
 // init
 const value2 = new Subject({ a: 1, b: 2 });
 
@@ -35,7 +35,7 @@ value2.subscribe((value) => console.log("example 2:", value));
 // update using Object.assign in the background
 value2.nextAssign({ a: 2 });
 
-// ---------- Example 3 ----------
+console.log('\n----- Example 3 ----- nextPush')
 // init
 const value3 = new Subject(["a"]);
 
@@ -44,11 +44,20 @@ value3.subscribe((value) => console.log("example 3:", value));
 
 // update using Array.push in the background
 value3.nextPush('b');
+console.log('\n')
 
-// ---------- Example 4: custom debug function ----------
+console.log('\n----- Example 4 ----- custom debug function')
 value3.debug = function(nextValue) {
     console.log('incoming value is:', nextValue)
     console.log('updated value:', this.value)
 }
 
 value3.nextPush("c")
+
+console.log('\n----- Example 5 ----- custom next function')
+const value5 = new Subject({ a: 1, b: 1 })
+value5.subscribe(newValue => console.log('value5', newValue))
+
+value5.next((prevValue) => {
+    return { ...prevValue, a: 2 }
+})
