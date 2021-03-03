@@ -1,10 +1,10 @@
 {
   "name": "subjecto",
-  "version": "0.0.18",
+  "version": "0.0.21",
   "description": "A minimalistic state management library",
   "main": "dist/index.js",
   "scripts": {
-    "postinstall": "tsc",
+    "prepare": "npm run build",
     "dev": "tsc --watch",
     "build": "tsc",
     "test": "jest"
