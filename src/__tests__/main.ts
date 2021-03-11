@@ -48,3 +48,15 @@ testSubjectPush.nextPush('b')
 test('nextPush update', () => {
    expect(testSubjectPush.value === ['a','b'])
 })
+
+const testToggle = new Subject(false)
+testToggle.toggle()
+test('toggle', () => {
+    expect(testToggle.value === true)
+})
+
+const testOnce = new Subject(1)
+testOnce.once(() => {})
+test('once', () => {
+    expect(Object.keys(testOnce.subscribers).length === 0)
+})

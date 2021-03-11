@@ -1,13 +1,10 @@
 //  API
-import { Subject, inspect } from "..";
+import { Subject } from "..";
 
 // ---------- Example 1 ----------
 // init
 const value1 = new Subject(new Date().toISOString());
 
-const store = {
-    value1
-}
 
 // optionally, you can inspect all subscriptions and value changes
 value1.debug = true;

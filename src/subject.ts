@@ -7,12 +7,14 @@ export type SubscriptionHandle = {
 
 interface Subject<T> {
   before: (nextValue: T) => T;
+  count: number;
   name: string;
   next: (nextValue: T|{ (prevValue:T):T }) => void;
   once: (subscription: Subscription<T>) => void;
   nextAssign: (nextValue: Partial<T>) => void;
   nextPush: (nextValue: any) => void;
   subscribe: (subscription: Subscription<T>) => SubscriptionHandle;
+  toggle: () => void
   unsubscribe: (subscriptionId: string) => void;
   value: T;
   subscribers: {
@@ -31,12 +33,13 @@ class Subject<T> {
     this.name = name || "noName";
     this.debug = false;
     this.before = (nextValue) => nextValue;
+    this.count = 1
   }
 }
 
 Subject.prototype.next = function (nextValue) {
   this.value = this.before(typeof nextValue === 'function' ? nextValue(this.value): nextValue);
-
+  this.count++
   Object.keys(this.subscribers).forEach((key) => {
     if (this.subscribers[key]) {
       this.subscribers[key](this.value);
@@ -63,11 +66,13 @@ Subject.prototype.nextAssign = function (newValue) {
   } catch (error) {
     this.next(newValue);
   }
+  this.count++
 };
 
 Subject.prototype.nextPush = function (value: typeof Subject.prototype.value) {
   if (Array.isArray(this.value)) {
     this.next([...this.value, value]);
+    this.count++
   }
 };
 
@@ -112,6 +117,12 @@ Subject.prototype.subscribe = function <T>(
   };
 };
 
+Subject.prototype.toggle = function() {
+    if (typeof this.value === 'boolean') {
+        this.next(!this.value)
+    }
+}
+
 /**
  * Unsubscribes the listener from the subject
  * @param id
@@ -127,6 +138,9 @@ Subject.prototype.complete = function () {
   Object.keys(this.subscribers).forEach((key) => this.unsubscribe(key));
 };
 
+/**
+ * Execute once and then unsubscribe
+ */
 Subject.prototype.once = function <T>(subscription: Subscription<T>): void {
   const handler = (this as Subject<T>).subscribe((value: T) => {
     subscription(value);
