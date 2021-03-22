@@ -9,18 +9,17 @@ interface Subject<T> {
   before: (nextValue: T) => T;
   count: number;
   name: string;
-  next: (nextValue: T|{ (prevValue:T):T }) => void;
+  next: (nextValue: T | { (prevValue: T): T }) => void;
   once: (subscription: Subscription<T>) => void;
   nextAssign: (nextValue: Partial<T>) => void;
   nextPush: (nextValue: any) => void;
   subscribe: (subscription: Subscription<T>) => SubscriptionHandle;
-  toggle: () => void
+  toggle: () => void;
   unsubscribe: (subscriptionId: string) => void;
   value: T;
   subscribers: {
     [key: string]: (value: T) => void;
   };
-  subscribersCount: () => number;
   complete: () => void;
   debug: ((nextValue: T) => void) | boolean;
   hook: (nextValue?: T) => T;
@@ -33,13 +32,15 @@ class Subject<T> {
     this.name = name || "noName";
     this.debug = false;
     this.before = (nextValue) => nextValue;
-    this.count = 1
+    this.count = 1;
   }
 }
 
 Subject.prototype.next = function (nextValue) {
-  this.value = this.before(typeof nextValue === 'function' ? nextValue(this.value): nextValue);
-  this.count++
+  this.value = this.before(
+    typeof nextValue === "function" ? nextValue(this.value) : nextValue
+  );
+  this.count++;
   Object.keys(this.subscribers).forEach((key) => {
     if (this.subscribers[key]) {
       this.subscribers[key](this.value);
@@ -49,12 +50,12 @@ Subject.prototype.next = function (nextValue) {
     if (typeof this.debug === "function") {
       this.debug(nextValue);
     } else {
-      console.log(`\n--- SUBJECTO DEBUG: \`${this.name}\` ---`)
+      console.log(`\n--- SUBJECTO DEBUG: \`${this.name}\` ---`);
       console.log(` ├ nextValue:`, nextValue);
       console.log(
         ` └ subscribers(${Object.keys(this.subscribers).length}): `,
         this,
-        '\n'
+        "\n"
       );
     }
   }
@@ -62,17 +63,17 @@ Subject.prototype.next = function (nextValue) {
 
 Subject.prototype.nextAssign = function (newValue) {
   try {
-    this.next(Object.assign(this.value, newValue));
+    this.next(Object.assign({}, this.value, newValue));
   } catch (error) {
     this.next(newValue);
   }
-  this.count++
+  this.count++;
 };
 
 Subject.prototype.nextPush = function (value: typeof Subject.prototype.value) {
   if (Array.isArray(this.value)) {
     this.next([...this.value, value]);
-    this.count++
+    this.count++;
   }
 };
 
@@ -117,11 +118,11 @@ Subject.prototype.subscribe = function <T>(
   };
 };
 
-Subject.prototype.toggle = function() {
-    if (typeof this.value === 'boolean') {
-        this.next(!this.value)
-    }
-}
+Subject.prototype.toggle = function () {
+  if (typeof this.value === "boolean") {
+    this.next(!this.value);
+  }
+};
 
 /**
  * Unsubscribes the listener from the subject
