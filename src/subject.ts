@@ -32,7 +32,11 @@ const defaultLocalStoragePrefix = 'subjectoValue'
 
 class Subject<T> {
   constructor(initialValue: T, name: string = defaultName, useLocalStorage: boolean = false) {
-    this.value = useLocalStorage && typeof localStorage !== 'undefined' && localStorage.getItem(name)? localStorage.getItem(name) as unknown as T : initialValue;
+    this.value = useLocalStorage &&
+     typeof localStorage !== 'undefined' &&
+     localStorage.getItem(defaultLocalStoragePrefix + name)
+      ? localStorage.getItem(defaultLocalStoragePrefix + name) as unknown as T 
+      : initialValue;
     this.subscribers = {};
     this.name = name;
     this.debug = false;
