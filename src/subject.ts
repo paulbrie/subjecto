@@ -52,7 +52,7 @@ Subject.prototype.next = function (nextValue) {
     typeof nextValue === "function" ? nextValue(this.value) : nextValue
   );
 
-  if (this.useLocalStorage) {
+  if (this.useLocalStorage?.length === 2) {
     this.saveToLocalStorage()
   }
 
