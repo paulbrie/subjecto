@@ -62,3 +62,4 @@ value5.subscribe(newValue => console.log('value5', newValue))
 value5.next((prevValue) => {
     return { ...prevValue, a: 2 }
 })
+

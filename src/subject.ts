@@ -16,21 +16,27 @@ interface Subject<T> {
   subscribe: (subscription: Subscription<T>) => SubscriptionHandle;
   toggle: () => void;
   unsubscribe: (subscriptionId: string) => void;
+  saveToLocalStorage: () => boolean;
   value: T;
   subscribers: {
     [key: string]: (value: T) => void;
   };
   complete: () => void;
   debug: ((nextValue: T) => void) | boolean;
+  useLocalStorage: boolean;
   hook: (nextValue?: T) => T;
 }
 
+const defaultName = 'noName'
+const defaultLocalStoragePrefix = 'subjectoValue'
+
 class Subject<T> {
-  constructor(initialValue: T, name?: string) {
-    this.value = initialValue;
+  constructor(initialValue: T, name: string = defaultName, useLocalStorage: boolean = false) {
+    this.value = useLocalStorage && localStorage?.getItem(name) ? localStorage.getItem(name) as unknown as T : initialValue;
     this.subscribers = {};
-    this.name = name || "noName";
+    this.name = name;
     this.debug = false;
+    this.useLocalStorage =useLocalStorage;
     this.before = (nextValue) => nextValue;
     this.count = 1;
   }
@@ -40,12 +46,18 @@ Subject.prototype.next = function (nextValue) {
   this.value = this.before(
     typeof nextValue === "function" ? nextValue(this.value) : nextValue
   );
+
+  if (this.useLocalStorage) {
+    this.saveToLocalStorage()
+  }
+
   this.count++;
   Object.keys(this.subscribers).forEach((key) => {
     if (this.subscribers[key]) {
       this.subscribers[key](this.value);
     }
   });
+  
   if (this.debug) {
     if (typeof this.debug === "function") {
       this.debug(nextValue);
@@ -69,6 +81,24 @@ Subject.prototype.nextAssign = function (newValue) {
   }
   this.count++;
 };
+
+Subject.prototype.saveToLocalStorage = function () {
+  if (this.name === defaultName) {
+    console.log('Subjecto will not save values that do not have a custom name')
+    return false
+  }
+  
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(defaultLocalStoragePrefix + this.name, this.value)
+      return true
+    } catch (error) {
+      return false
+    }
+  }
+
+  return false
+}
 
 Subject.prototype.nextPush = function (value: typeof Subject.prototype.value) {
   if (Array.isArray(this.value)) {
