@@ -23,7 +23,7 @@ interface Subject<T> {
   };
   complete: () => void;
   debug: ((nextValue: T) => void) | boolean;
-  useLocalStorage: boolean;
+  useLocalStorage?: [(value:T) => string, (value: string) => T]  
   hook: (nextValue?: T) => T;
 }
 
@@ -31,11 +31,12 @@ const defaultName = 'noName'
 const defaultLocalStoragePrefix = 'subjectoValue'
 
 class Subject<T> {
-  constructor(initialValue: T, name: string = defaultName, useLocalStorage: boolean = false) {
+  constructor(initialValue: T, name: string = defaultName, useLocalStorage?: [(value:T) => string, (value: string) => T]) {
     this.value = useLocalStorage &&
      typeof localStorage !== 'undefined' &&
      localStorage.getItem(defaultLocalStoragePrefix + name)
-      ? localStorage.getItem(defaultLocalStoragePrefix + name) as unknown as T 
+      // @ts-ignore
+      ? useLocalStorage[0](localStorage.getItem(defaultLocalStoragePrefix + name)) as T
       : initialValue;
     this.subscribers = {};
     this.name = name;
@@ -92,9 +93,9 @@ Subject.prototype.saveToLocalStorage = function () {
     return false
   }
   
-  if (typeof localStorage !== 'undefined') {
+  if (typeof localStorage !== 'undefined' && this.useLocalStorage?.length === 2) {
     try {
-      localStorage.setItem(defaultLocalStoragePrefix + this.name, this.value)
+      localStorage.setItem(defaultLocalStoragePrefix + this.name, this.useLocalStorage[1](this.value))
       return true
     } catch (error) {
       return false
