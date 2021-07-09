@@ -32,11 +32,11 @@ const defaultLocalStoragePrefix = 'subjectoValue'
 
 class Subject<T> {
   constructor(initialValue: T, name: string = defaultName, useLocalStorage: boolean = false) {
-    this.value = useLocalStorage && localStorage?.getItem(name) ? localStorage.getItem(name) as unknown as T : initialValue;
+    this.value = useLocalStorage && typeof localStorage !== 'undefined' && localStorage.getItem(name)? localStorage.getItem(name) as unknown as T : initialValue;
     this.subscribers = {};
     this.name = name;
     this.debug = false;
-    this.useLocalStorage =useLocalStorage;
+    this.useLocalStorage = useLocalStorage;
     this.before = (nextValue) => nextValue;
     this.count = 1;
   }
@@ -57,7 +57,7 @@ Subject.prototype.next = function (nextValue) {
       this.subscribers[key](this.value);
     }
   });
-  
+
   if (this.debug) {
     if (typeof this.debug === "function") {
       this.debug(nextValue);
