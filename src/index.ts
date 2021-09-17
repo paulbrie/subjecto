@@ -1,2 +1,4 @@
-export { default as Subject } from "./subject";
-export { default as inspect } from "./inspect";
+import Subject from "./subject";
+import Inspect from "./inspect";
+
+export { Subject, Inspect };

@@ -1,14 +1,15 @@
 {
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "outDir": "dist/cjs",
+    "rootDir": "src",
     "target": "es5",
-    "module": "commonjs",
-    "lib": ["ESNext", "DOM"],
+    "module": "esnext",
+    "lib": ["esnext", "DOM"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": true
+    "declaration": true,
+    "moduleResolution": "node"
   }
 }
