@@ -6,7 +6,7 @@ jobs:
     executor: node/default
     steps:
       - checkout
-      - mkdir dist
+      - run: mkdir dist
       - run: npm i
       - run: npm i typescript
       - run: npm run build
