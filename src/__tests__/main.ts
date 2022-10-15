@@ -31,22 +31,23 @@ test('unsubscription is successful', () => {
    expect(Object.keys(testSubject.subscribers).length === 0)
 })
 
-const testSubjectAssign = new Subject<null | { a: number, b: number }>(null)
+const testSubjectAssign = new Subject<null | { a: number, b: number }>(null!)
 
-testSubjectAssign.nextAssign({ a: 1, b: 1})
+const testObj = { a: 1, b: 1}
+testSubjectAssign.nextAssign(testObj)
 test('nextAssign new object value', () => {
-   expect(testSubjectAssign.value === { a: 1, b: 1 })
+   expect(testSubjectAssign.value === testObj)
 })
 
 testSubjectAssign.nextAssign({ a: 2 })
 test('nextAssign update', () => {
-   expect(testSubjectAssign.value === { a: 2, b: 1 })
+   expect(testSubjectAssign.value?.a === 2)
 })
 
 const testSubjectPush = new Subject(['a'])
 testSubjectPush.nextPush('b')
 test('nextPush update', () => {
-   expect(testSubjectPush.value === ['a','b'])
+   expect(testSubjectPush.value[1] === 'b')
 })
 
 const testToggle = new Subject(false)
