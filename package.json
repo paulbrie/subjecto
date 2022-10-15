@@ -24,7 +24,7 @@
   "scripts": {
     "prepare": "rm -r dist && npm run build",
     "watch": "tsc --watch",
-    "build": "rm -r dist && tsc -p tsconfig.json && tsc -p tsconfig.json --module commonjs --outDir dist/cjs",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.json --module commonjs --outDir dist/cjs",
     "test": "jest",
     "dev": "node --experimental-specifier-resolution=node dist/esm/workspace"
   },
