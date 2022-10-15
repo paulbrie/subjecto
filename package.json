@@ -1,11 +1,12 @@
 {
   "name": "subjecto",
-  "version": "0.0.34",
+  "version": "0.0.35",
   "description": "A minimalistic state management library",
   "main": "dist/cjs/index.js",
   "types": "dist/cjs/index.d.ts",
   "module": "dist/esm/index.js",
   "sideEffects": "false",
+  "type": "module",
   "exports": {
     ".": {
       "import": "./dist/esm/index.js",
@@ -22,9 +23,10 @@
   },
   "scripts": {
     "prepare": "rm -r dist &&  npm run build",
-    "dev": "tsc --watch",
-    "build": "rm -r dist && tsc -p tsconfig.json && tsc -p tsconfig.json --module commonjs --outDir dist/esm",
-    "test": "jest"
+    "watch": "tsc --watch",
+    "build": "rm -r dist && tsc -p tsconfig.json && tsc -p tsconfig.json --module commonjs --outDir dist/cjs",
+    "test": "jest",
+    "dev": "node --experimental-specifier-resolution=node dist/esm/workspace"
   },
   "jest": {
     "preset": "ts-jest",
