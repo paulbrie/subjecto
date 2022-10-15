@@ -13,5 +13,5 @@ jobs:
     executor: node/default
     steps:
       - checkout
-      - run: npm install
-      - run: ls
+      - node/install-packages
+      - run: npm run build
