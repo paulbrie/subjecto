@@ -1,6 +1,6 @@
 {
   "name": "subjecto",
-  "version": "0.0.35",
+  "version": "0.0.37",
   "description": "A minimalistic state management library",
   "main": "dist/cjs/index.js",
   "types": "dist/cjs/index.d.ts",
