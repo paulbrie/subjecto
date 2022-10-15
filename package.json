@@ -26,7 +26,8 @@
     "watch": "tsc --watch",
     "build": "rm -r dist && tsc -p tsconfig.json && tsc -p tsconfig.json --module commonjs --outDir dist/cjs",
     "test": "jest",
-    "dev": "node --experimental-specifier-resolution=node dist/esm/workspace"
+    "dev": "node --experimental-specifier-resolution=node dist/esm/workspace",
+    "start": "npm run watch"
   },
   "jest": {
     "preset": "ts-jest",
