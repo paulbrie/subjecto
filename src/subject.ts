@@ -23,18 +23,18 @@ interface Subject<T> {
   };
   complete: () => void;
   debug: ((nextValue: T) => void) | boolean;
-  useLocalStorage?: [(value:T) => string, (value: string) => T]  
-  hook: (nextValue?: T) => T;
+  useLocalStorage?: [(value: T) => string, (value: string) => T]
+  hook: (nextValue?: T) => T
 }
 
 const defaultName = 'noName'
 const defaultLocalStoragePrefix = 'subjectoValue'
 
 class Subject<T> {
-  constructor(initialValue: T, name: string = defaultName, useLocalStorage?: [(value:T) => string, (value: string) => T]) {
+  constructor(initialValue: T, name: string = defaultName, useLocalStorage?: [(value: T) => string, (value: string) => T]) {
     this.value = useLocalStorage?.length === 2 &&
-     typeof localStorage !== 'undefined' &&
-     localStorage.getItem(defaultLocalStoragePrefix + name)
+      typeof localStorage !== 'undefined' &&
+      localStorage.getItem(defaultLocalStoragePrefix + name)
       // @ts-ignore
       ? useLocalStorage[0](localStorage.getItem(defaultLocalStoragePrefix + name)) as T
       : initialValue;
@@ -92,7 +92,7 @@ Subject.prototype.saveToLocalStorage = function () {
     console.log('Subjecto will not save values that do not have a custom name')
     return false
   }
-  
+
   if (typeof localStorage !== 'undefined' && this.useLocalStorage?.length === 2) {
     try {
       localStorage.setItem(defaultLocalStoragePrefix + this.name, this.useLocalStorage[1](this.value))
@@ -124,8 +124,7 @@ Subject.prototype.subscribe = function <T>(
     this.subscribers[id] = subscription;
     if (this.debug) {
       log(
-        `${this.name} / new subscription - (${
-          Object.keys(this.subscribers).length
+        `${this.name} / new subscription - (${Object.keys(this.subscribers).length
         })`,
         `debug`
       );
@@ -142,8 +141,7 @@ Subject.prototype.subscribe = function <T>(
       this.unsubscribe(id);
       if (this.debug) {
         log(
-          `Subject \`${this.name}\` has \`${
-            Object.keys(this.subscribers).length
+          `Subject \`${this.name}\` has \`${Object.keys(this.subscribers).length
           }\` subscribers left.`,
           "debug"
         );
