@@ -10,7 +10,7 @@ interface Subject<T> {
   count: number;
   name: string;
   next: (nextValue: T | { (prevValue: T): T }) => void;
-  updateIfDifferent: boolean;
+  updateIfStrictlyEqual: boolean;
   once: (subscription: Subscription<T>) => void;
   nextAssign: (nextValue: Partial<T>) => void;
   nextPush: (nextValue: any) => void;
@@ -49,14 +49,14 @@ class Subject<T> {
     this.subscribers = {};
     this.debug = false;
     this.useLocalStorage = useLocalStorage;
-    this.updateIfDifferent = typeof options === 'object' && typeof options.updateIfDifferent === 'boolean' ? options.updateIfDifferent : true
+    this.updateIfStrictlyEqual = typeof options === 'object' && typeof options.updateIfDifferent === 'boolean' ? options.updateIfDifferent : true
     this.before = (nextValue) => nextValue;
     this.count = 1;
   }
 }
 
 Subject.prototype.next = function (nextValue) {
-  if (this.updateIfDifferent && this.value === nextValue) {
+  if (!this.updateIfStrictlyEqual && this.value === nextValue) {
     return;
   }
 

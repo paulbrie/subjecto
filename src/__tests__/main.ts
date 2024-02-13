@@ -66,7 +66,7 @@ const testDifferent = new Subject(1, {
     updateIfDifferent: false
 })
 testDifferent.next(1)
-test('updateIfDifferent', () => {
+test('updateIfStrictlyEqual', () => {
     expect(testDifferent.count === 1)
 })
 
