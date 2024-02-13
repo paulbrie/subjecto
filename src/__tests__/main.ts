@@ -63,7 +63,7 @@ test('once', () => {
 })
 
 const testDifferent = new Subject(1, {
-    updateIfDifferent: false
+    updateIfStrictlyEqual: false
 })
 testDifferent.next(1)
 test('updateIfStrictlyEqual', () => {

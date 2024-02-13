@@ -31,7 +31,7 @@ interface Subject<T> {
 interface SubjectConstructorOptions {
   useLocalStorage?: [(value: any) => string, (value: string) => any]
   name?: string
-  updateIfDifferent?: boolean
+  updateIfStrictlyEqual?: boolean
 }
 
 const defaultName = 'noName'
@@ -49,7 +49,7 @@ class Subject<T> {
     this.subscribers = {};
     this.debug = false;
     this.useLocalStorage = useLocalStorage;
-    this.updateIfStrictlyEqual = typeof options === 'object' && typeof options.updateIfDifferent === 'boolean' ? options.updateIfDifferent : true
+    this.updateIfStrictlyEqual = typeof options === 'object' && typeof options.updateIfStrictlyEqual === 'boolean' ? options.updateIfStrictlyEqual : true
     this.before = (nextValue) => nextValue;
     this.count = 1;
   }
