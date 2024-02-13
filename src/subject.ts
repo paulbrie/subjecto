@@ -10,6 +10,7 @@ interface Subject<T> {
   count: number;
   name: string;
   next: (nextValue: T | { (prevValue: T): T }) => void;
+  updateIfDifferent: boolean;
   once: (subscription: Subscription<T>) => void;
   nextAssign: (nextValue: Partial<T>) => void;
   nextPush: (nextValue: any) => void;
@@ -27,27 +28,38 @@ interface Subject<T> {
   hook: (nextValue?: T) => T
 }
 
+interface SubjectConstructorOptions {
+  useLocalStorage?: [(value: any) => string, (value: string) => any]
+  name?: string
+  updateIfDifferent?: boolean
+}
+
 const defaultName = 'noName'
 const defaultLocalStoragePrefix = 'subjectoValue'
 
 class Subject<T> {
-  constructor(initialValue: T, name: string = defaultName, useLocalStorage?: [(value: T) => string, (value: string) => T]) {
+  constructor(initialValue: T, options?: string | SubjectConstructorOptions, useLocalStorage?: [(value: T) => string, (value: string) => T]) {
+    this.name = typeof options === 'string' ? options : options?.name || defaultName
     this.value = useLocalStorage?.length === 2 &&
       typeof localStorage !== 'undefined' &&
-      localStorage.getItem(defaultLocalStoragePrefix + name)
+      localStorage.getItem(defaultLocalStoragePrefix + this.name)
       // @ts-ignore
-      ? useLocalStorage[0](localStorage.getItem(defaultLocalStoragePrefix + name)) as T
+      ? useLocalStorage[0](localStorage.getItem(defaultLocalStoragePrefix + this.name)) as T
       : initialValue;
     this.subscribers = {};
-    this.name = name;
     this.debug = false;
     this.useLocalStorage = useLocalStorage;
+    this.updateIfDifferent = typeof options === 'object' && typeof options.updateIfDifferent === 'boolean' ? options.updateIfDifferent : true
     this.before = (nextValue) => nextValue;
     this.count = 1;
   }
 }
 
 Subject.prototype.next = function (nextValue) {
+  if (this.updateIfDifferent && this.value === nextValue) {
+    return;
+  }
+
   this.value = this.before(
     typeof nextValue === "function" ? nextValue(this.value) : nextValue
   );

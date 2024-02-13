@@ -1,13 +1,14 @@
 {
   "name": "subjecto",
-  "version": "0.0.50",
+  "version": "0.0.51",
   "description": "A minimalistic state management library",
   "types": "dist/types/index.d.ts",
   "scripts": {
     "prepare": "if [ -d 'dist' ]; then rm -rf dist && npm run build; fi",
     "watch": "tsc --watch",
     "build": "tsc -b ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json",
-    "test": "jest"
+    "test": "jest",
+    "dev": "node --experimental-specifier-resolution=node dist/cjs/workspace"
   },
   "exports": {
     ".": {

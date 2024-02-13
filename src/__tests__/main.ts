@@ -61,3 +61,19 @@ testOnce.once(() => { })
 test('once', () => {
     expect(Object.keys(testOnce.subscribers).length === 0)
 })
+
+const testDifferent = new Subject(1, {
+    updateIfDifferent: false
+})
+testDifferent.next(1)
+test('updateIfDifferent', () => {
+    expect(testDifferent.count === 1)
+})
+
+const testNameWithOptions = new Subject(1, {
+    name: 'name'
+})
+test('name', () => {
+    expect(testNameWithOptions.name === 'name')
+})
+
