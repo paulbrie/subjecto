@@ -57,11 +57,3 @@ value3.debug = function(nextValue) {
 
 value3.nextPush("c")
 
-console.log('\n----- Example 5 ----- custom next function')
-const value5 = new Subject({ a: 1, b: 1 })
-value5.subscribe(newValue => console.log('value5', newValue))
-
-value5.next((prevValue) => {
-    return { ...prevValue, a: 2 }
-})
-
