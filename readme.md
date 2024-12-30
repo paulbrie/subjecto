@@ -40,8 +40,6 @@ value.complete();
 
 ## Live Demo
 
-https://codesandbox.io/s/distracted-meadow-vsqwd?file=/src/index.ts
-
 ## Licence
 
 MIT

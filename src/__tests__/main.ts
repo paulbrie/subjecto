@@ -1,63 +1,213 @@
-import { Subject } from '../index'
+import Subject from '../subject'
+import { ERROR_MESSAGES, DEFAULT_NAME, DEFAULT_MAX_SUBSCRIBERS, DEFAULT_UPDATE_IF_STRICTLY_EQUAL } from '../subject'
 
-const testSubject = new Subject('', 'name')
-test('instantiation', () => {
-    expect(testSubject.value === '')
-    expect(testSubject.name === 'name')
-});
+describe('instantiation', () => {
+    test('assigns a value to the subject', () => {
+        const subject = new Subject('a');
+        expect(subject.value).toBe("a");
+    });
 
-testSubject.next('new value')
-test('new value is added correctly', () => {
-    expect(testSubject.value === 'new value')
+    test('sets option strictly equal', () => {
+        const subject = new Subject('a', {
+            updateIfStrictlyEqual: false,
+        });
+        subject.next('a');
+        expect(subject.count).toBe(1);
+    });
+
+    test('sets option maxSubscribers', () => {
+        const subject = new Subject('a', {
+            maxSubscribers: 1
+        });
+        try {
+            const sub1 = subject.subscribe(() => null);
+            const sub2 = subject.subscribe(() => null);
+        } catch (error) {
+            expect(error).toBe(ERROR_MESSAGES.MAX_SUBSCRIBERS_REACHED);
+            expect(subject.subscribers.size).toBe(1);
+        }
+    })
+
+    test('sets a custom name', () => {
+        const subject = new Subject('a', {
+            name: "test"
+        });
+        expect(subject.options.name).toBe("test");
+    });
+
+    test('sets default options', () => {
+        const subject = new Subject('a');
+        expect(subject.options).toStrictEqual({
+            name: DEFAULT_NAME,
+            updateIfStrictlyEqual: DEFAULT_UPDATE_IF_STRICTLY_EQUAL,
+            maxSubscribers: DEFAULT_MAX_SUBSCRIBERS,
+        });
+    })
 })
 
-const onNewValue = (value: string) => console.log(value)
-const handler = testSubject.subscribe(onNewValue)
-test('handler is registered', () => {
-    expect(testSubject.subscribers[0] === onNewValue)
+describe('subscription', () => {
+    test('called with the new value', () => {
+        const subject = new Subject('a');
+
+        const subscriber = jest.fn();
+        subject.subscribe(subscriber);
+
+        subject.next('b');
+
+        expect(subject.value).toEqual('b');
+        expect(subscriber).toHaveBeenCalledWith('b');
+    })
 })
 
-test('handler format is correct', () => {
-    expect(typeof handler.id === "string")
-    expect(typeof handler.unsubscribe === "function")
+describe('debug', () => {
+    test('logs the next value', () => {
+        const subject = new Subject('a');
+        console.log = jest.fn();
+        subject.debug = true;
+        subject.next('b');
+        expect(console.log).toHaveBeenCalled()
+    });
+
+    test('logs when unsubscribing', () => {
+        const subject = new Subject('a');
+        subject.debug = true;
+        const sub = subject.subscribe(() => null);
+        console.log = jest.fn();
+        sub.unsubscribe();
+        expect(console.log).toHaveBeenCalled();
+    });
+
+    test('executes custom debug function', () => {
+        const subject = new Subject('a');
+        const debug = jest.fn();
+        subject.debug = debug;
+        subject.next('b');
+        expect(debug).toHaveBeenCalledWith('b');
+    });
 })
 
-test('hook is working', () => {
-    expect(testSubject.hook() === testSubject.value)
+describe('assigning values', () => {
+    test('next', () => {
+        const subject = new Subject('a');
+        subject.next('b');
+        expect(subject.value).toBe('b');
+    });
+
+    test('next with function', () => {
+        const subject = new Subject('a');
+        subject.next('b');
+        expect(subject.value).toBe('b');
+    });
+
+    test('nextAssign: new object value', () => {
+        const subject = new Subject<null | { a: number, b: number }>(null!);
+        const newValue = { a: 1, b: 1 };
+        subject.nextAssign(newValue)
+        expect(subject.value === newValue);
+    })
+
+    test('nextAssign: update', () => {
+        const subject = new Subject({ a: 1 })
+        subject.nextAssign({ a: 2 });
+        expect(subject.value.a === 2);
+    })
+
+    test('nextAssign: fail message', () => {
+        const subject = new Subject('a');
+        try {
+            // @ts-expect-error bad type
+            subject.nextAssign(100);
+        } catch (err) {
+            expect(err === ERROR_MESSAGES.VALUE_NOT_OBJECT && subject.value === "a");
+        }
+    })
+
+    test('nextPush: update', () => {
+        const subject = new Subject(['a'])
+        subject.nextPush('b')
+        expect(subject.value[1] === 'b')
+    })
+
+    test('nextPush: fail message', () => {
+        const subject = new Subject('a');
+        try {
+            subject.nextPush(100);
+        } catch (err) {
+            expect(err === ERROR_MESSAGES.VALUE_NOT_ARRAY && subject.value === "a");
+        }
+    })
+
+    test('toggle', () => {
+        const subject = new Subject(false)
+        subject.toggle()
+        expect(subject.value === true)
+    })
+
+    test('before', () => {
+        const subject = new Subject(false)
+        subject.before = (value: boolean) => !value;
+        subject.next(true);
+        expect(subject.value).toStrictEqual(false);
+    })
 })
 
-handler.unsubscribe()
-test('unsubscription is successful', () => {
-    expect(Object.keys(testSubject.subscribers).length === 0)
+describe('handler', () => {
+    test('handler is registered', () => {
+        const subject = new Subject('a');
+        const onNewValue = (value: string) => console.log(value);
+        const handler = subject.subscribe(onNewValue);
+        expect(subject.subscribers.get(handler.id) === onNewValue);
+    })
+
+    test('handler format is correct', () => {
+        const subject = new Subject('a');
+        const handler = subject.subscribe(() => null)
+        expect(typeof handler.id === "string")
+        expect(typeof handler.unsubscribe === "function")
+    })
+
 })
 
-const testSubjectAssign = new Subject<null | { a: number, b: number }>(null!)
+describe('unsubscribe', () => {
+    test('unsubscription', () => {
+        const subject = new Subject('a');
+        const handler = subject.subscribe(() => null)
+        handler.unsubscribe();
+        expect(Object.keys(subject.subscribers).length === 0);
+    })
 
-const testObj = { a: 1, b: 1 }
-testSubjectAssign.nextAssign(testObj)
-test('nextAssign new object value', () => {
-    expect(testSubjectAssign.value === testObj)
+    test('unsubscription with id', () => {
+        const subject = new Subject('a');
+        const handler = subject.subscribe(() => null)
+        subject.unsubscribe(handler.id)
+        expect(Object.keys(subject.subscribers).length === 0);
+    });
+
+    test('once', () => {
+        const subject = new Subject('a');
+        const sub = jest.fn()
+        subject.once(sub);
+        subject.next('b');
+        subject.next('c');
+
+        expect(sub).toBeCalledTimes(1);
+        expect(Object.keys(subject.subscribers).length === 0);
+    })
+
+    test('complete', () => {
+        const subject = new Subject('a');
+        subject.complete();
+        expect(Object.keys(subject.subscribers).length === 0);
+    })
 })
 
-testSubjectAssign.nextAssign({ a: 2 })
-test('nextAssign update', () => {
-    expect(testSubjectAssign.value?.a === 2)
-})
-
-const testSubjectPush = new Subject(['a'])
-testSubjectPush.nextPush('b')
-test('nextPush update', () => {
-    expect(testSubjectPush.value[1] === 'b')
-})
-
-const testToggle = new Subject(false)
-testToggle.toggle()
-test('toggle', () => {
-    expect(testToggle.value === true)
-})
-
-const testOnce = new Subject(1)
-testOnce.once(() => { })
-test('once', () => {
-    expect(Object.keys(testOnce.subscribers).length === 0)
+describe('others', () => {
+    test('hook', () => {
+        const subject = new Subject('a');
+        const next = jest.fn();
+        subject.next = next;
+        subject.hook('b');
+        expect(next).toHaveBeenCalledWith('b');
+        expect(subject.hook() === subject.value)
+    });
 })

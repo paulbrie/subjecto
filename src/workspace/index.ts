@@ -11,7 +11,7 @@ value1.debug = true;
 
 // subscribe to changes
 const handler1 = value1.subscribe((newValue: string) => {
-  console.log("example 1:", newValue);
+    console.log("example 1:", newValue);
 });
 
 // get handlers uid
@@ -28,7 +28,9 @@ value1.complete();
 
 console.log('\n----- Example 2 ----- nextAssign')
 // init
-const value2 = new Subject({ a: 1, b: 2 });
+const value2 = new Subject<{
+    [key: string]: number
+}>({ a: 1, b: 2 });
 
 // subscribe
 value2.subscribe((value) => console.log("example 2:", value));
@@ -60,6 +62,6 @@ const value5 = new Subject({ a: 1, b: 1 })
 value5.subscribe(newValue => console.log('value5', newValue))
 
 value5.next((prevValue) => {
-    return { ...prevValue, a: 2 }
+    return { ...prevValue, a: 2 }
 })
 

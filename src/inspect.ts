@@ -6,9 +6,9 @@ let activated = false;
 const inspectStore = (store: any, keys: string[] = [], path = '') => {
   if (store) {
     Object.keys(store).forEach((key) => {
-    if (
+      if (
         store[key] instanceof Subject &&
-        (keys.includes(store[key].name) || keys.length === 0)
+        (keys.includes(store[key].options.name || '') || keys.length === 0)
       ) {
         store[key].subscribe((value: typeof Subject.prototype['value']) => {
           const elapsed = new Date().getTime() - lastTime.getTime();
@@ -29,8 +29,8 @@ const inspectStore = (store: any, keys: string[] = [], path = '') => {
   }
 };
 
-export default (store: any, keys:string[] = []) => {
-    if (!activated) {
-        inspectStore(store, keys)
-    }
+export default (store: any, keys: string[] = []) => {
+  if (!activated) {
+    inspectStore(store, keys)
+  }
 }
