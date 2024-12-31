@@ -1,6 +1,6 @@
 {
   "name": "subjecto",
-  "version": "0.0.54",
+  "version": "0.0.55",
   "description": "A minimalistic state management library",
   "types": "dist/types/index.d.ts",
   "scripts": {

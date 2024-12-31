@@ -1,5 +1,5 @@
 import Subject from '../subject'
-import { ERROR_MESSAGES, DEFAULT_NAME, DEFAULT_MAX_SUBSCRIBERS, DEFAULT_UPDATE_IF_STRICTLY_EQUAL } from '../subject'
+import { ERROR_MESSAGES, DEFAULT_NAME, DEFAULT_UPDATE_IF_STRICTLY_EQUAL } from '../subject'
 
 describe('instantiation', () => {
     test('assigns a value to the subject', () => {
@@ -15,19 +15,6 @@ describe('instantiation', () => {
         expect(subject.count).toBe(1);
     });
 
-    test('sets option maxSubscribers', () => {
-        const subject = new Subject('a', {
-            maxSubscribers: 1
-        });
-        try {
-            const sub1 = subject.subscribe(() => null);
-            const sub2 = subject.subscribe(() => null);
-        } catch (error) {
-            expect(error).toBe(ERROR_MESSAGES.MAX_SUBSCRIBERS_REACHED);
-            expect(subject.subscribers.size).toBe(1);
-        }
-    })
-
     test('sets a custom name', () => {
         const subject = new Subject('a', {
             name: "test"
@@ -40,7 +27,6 @@ describe('instantiation', () => {
         expect(subject.options).toStrictEqual({
             name: DEFAULT_NAME,
             updateIfStrictlyEqual: DEFAULT_UPDATE_IF_STRICTLY_EQUAL,
-            maxSubscribers: DEFAULT_MAX_SUBSCRIBERS,
         });
     })
 })
@@ -190,7 +176,7 @@ describe('unsubscribe', () => {
         subject.next('b');
         subject.next('c');
 
-        expect(sub).toBeCalledTimes(1);
+        expect(sub).toHaveBeenCalledTimes(1);
         expect(Object.keys(subject.subscribers).length === 0);
     })
 
