@@ -97,7 +97,6 @@ class Subject<T> {
         this.count++;
 
         this.subscribers.forEach((subscription) => {
-            console.log('subscription', subscription)
             subscription(this.value);
         });
 
