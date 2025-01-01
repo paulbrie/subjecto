@@ -1,52 +1,52 @@
 //  API
-import { Subject } from "..";
+import { Subject } from ".."
 
 // ---------- Example 1 ----------
 // init
-const value1 = new Subject(new Date().toISOString());
+const value1 = new Subject(new Date().toISOString())
 
 
 // optionally, you can inspect all subscriptions and value changes
-value1.debug = true;
+value1.debug = true
 
 // subscribe to changes
 const handler1 = value1.subscribe((newValue: string) => {
-    console.log("example 1:", newValue);
-});
+    console.log("example 1:", newValue)
+})
 
 // get handlers uid
-console.log(handler1.id);
+console.log(handler1.id)
 
 // push a new value
-value1.next(new Date().toISOString());
+value1.next(new Date().toISOString())
 
 // unsubscribe
-handler1.unsubscribe();
+handler1.unsubscribe()
 
 // flush all subscriptions
-value1.complete();
+value1.complete()
 
 console.log('\n----- Example 2 ----- nextAssign')
 // init
 const value2 = new Subject<{
     [key: string]: number
-}>({ a: 1, b: 2 });
+}>({ a: 1, b: 2 })
 
 // subscribe
-value2.subscribe((value) => console.log("example 2:", value));
+value2.subscribe((value) => console.log("example 2:", value))
 
 // update using Object.assign in the background
-value2.nextAssign({ a: 2 });
+value2.nextAssign({ a: 2 })
 
 console.log('\n----- Example 3 ----- nextPush')
 // init
-const value3 = new Subject(["a"]);
+const value3 = new Subject(["a"])
 
 // subscribe
-value3.subscribe((value) => console.log("example 3:", value));
+value3.subscribe((value) => console.log("example 3:", value))
 
 // update using Array.push in the background
-value3.nextPush('b');
+value3.nextPush('b')
 console.log('\n')
 
 console.log('\n----- Example 4 ----- custom debug function')

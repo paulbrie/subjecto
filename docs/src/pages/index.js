@@ -1,10 +1,10 @@
-import React, { useEffect } from "react";
-import clsx from "clsx";
-import Layout from "@theme/Layout";
-import Link from "@docusaurus/Link";
-import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
-import useBaseUrl from "@docusaurus/useBaseUrl";
-import styles from "./styles.module.css";
+import React, { useEffect } from "react"
+import clsx from "clsx"
+import Layout from "@theme/Layout"
+import Link from "@docusaurus/Link"
+import useDocusaurusContext from "@docusaurus/useDocusaurusContext"
+import useBaseUrl from "@docusaurus/useBaseUrl"
+import styles from "./styles.module.css"
 
 const features = [
   {
@@ -31,10 +31,10 @@ const features = [
     title: "Simple Api",
     description: <></>,
   },
-];
+]
 
 function Feature({ imageUrl, title, description }) {
-  const imgUrl = useBaseUrl(imageUrl);
+  const imgUrl = useBaseUrl(imageUrl)
   return (
     <div className={clsx("col col--4", styles.feature)}>
       {imgUrl && (
@@ -45,16 +45,16 @@ function Feature({ imageUrl, title, description }) {
       <h3>{title}</h3>
       <p>{description}</p>
     </div>
-  );
+  )
 }
 
 export default function Home() {
-  const context = useDocusaurusContext();
-  const { siteConfig = {} } = context;
+  const context = useDocusaurusContext()
+  const { siteConfig = {} } = context
   useEffect(() => {
-    document.location = "docs";
-  }, []);
-  return <></>;
+    document.location = "docs"
+  }, [])
+  return <></>
   return (
     <Layout
       title={`Hello from ${siteConfig.title}`}
@@ -91,5 +91,5 @@ export default function Home() {
         )}
       </main>
     </Layout>
-  );
+  )
 }

@@ -1,4 +1,4 @@
-import Subject from "./subject";
-import Inspect from "./inspect";
+import Subject from "./subject"
+import Inspect from "./inspect"
 
-export { Subject, Inspect };
+export { Subject, Inspect }

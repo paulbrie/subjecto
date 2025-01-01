@@ -1,5 +1,5 @@
 //  API
-import { Subject, Inspect } from "..";
+import { Subject, Inspect } from ".."
 
 const store = {
   value1: new Subject(new Date().toISOString()),
@@ -9,10 +9,10 @@ const store = {
       aha: new Subject(""),
     },
   },
-};
+}
 
-Inspect(store);
-store.value1.next("something");
-store.level2.demo.next("test");
-store.level2.demo.next("test1");
-store.level2.level3.aha.next("test1");
+Inspect(store)
+store.value1.next("something")
+store.level2.demo.next("test")
+store.level2.demo.next("test1")
+store.level2.level3.aha.next("test1")
