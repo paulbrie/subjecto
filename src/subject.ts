@@ -25,8 +25,8 @@ export const INFO_MESSAGES = {
 }
 
 
-class Subject<T> {
-    value: T
+export class Subject<T> {
+    private value: T
     /**
      * The list of all the subscribers
      */
@@ -131,22 +131,21 @@ class Subject<T> {
     subscribe(
         subscription: Subscription<T>
     ): SubscriptionHandle {
-
-        const subscriptionId = Symbol(new Date().getTime())
-        this.subscribers.set(subscriptionId, subscription)
-
+        const id = Symbol('subscriber');
+        this.subscribers.set(id, subscription);
+        subscription(this.value);
         return {
             unsubscribe: () => {
-                this.unsubscribe(subscriptionId)
+                this.unsubscribe(id);
                 if (this.debug) {
                     console.log(
                         `Subject \`${this.options.name}\` has \`${this.subscribers.size}\` subscribers left.`
-                    )
-                    console.log(this.options.name === DEFAULT_NAME ? INFO_MESSAGES : "")
+                    );
+                    console.log(this.options.name === DEFAULT_NAME ? INFO_MESSAGES : "");
                 }
             },
-            id: subscriptionId,
-        }
+            id,
+        };
     };
 
     /**
@@ -181,10 +180,13 @@ class Subject<T> {
      * @param subscription Susbcription<T>
      */
     once(subscription: Subscription<T>): void {
-        const handler = (this as Subject<T>).subscribe((value: T) => {
-            subscription(value)
-            handler.unsubscribe()
-        })
+        const id = Symbol('subscriber-once');
+        this.subscribers.set(id, (value: T) => {
+            subscription(value);
+            this.unsubscribe(id);
+        });
+        // Immediately call with the current value
+        this.subscribers.get(id)?.(this.value);
     };
 
     /**
@@ -200,6 +202,10 @@ class Subject<T> {
         }
         return this.value
     };
+
+    getValue(): T {
+        return this.value;
+    }
 }
 
 export default Subject
