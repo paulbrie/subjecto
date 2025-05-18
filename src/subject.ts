@@ -1,7 +1,7 @@
 export type Subscription<T> = (value: T) => void;
 export type SubscriptionHandle = {
     unsubscribe: () => void
-    id: string
+    id: symbol
 };
 
 interface SubjectConstructorOptions {
@@ -30,7 +30,7 @@ class Subject<T> {
     /**
      * The list of all the subscribers
      */
-    subscribers: Map<string, Subscription<T>>
+    subscribers: Map<symbol, Subscription<T>>
     /**
      * Enables debug logs
      * 
@@ -51,12 +51,10 @@ class Subject<T> {
      * Subject options
      */
     options: SubjectConstructorOptions
-    /**
-     * Each time a new subscription is added, this is incremented and used to generate a unique id for the subscription.
-     */
-    subscriberId: number
+    me: Subject<T>
 
     constructor(initialValue: T, options?: SubjectConstructorOptions) {
+        this.me = this
         this.options = {
             name: typeof options === 'object' ? options?.name : DEFAULT_NAME,
             updateIfStrictlyEqual:
@@ -64,7 +62,6 @@ class Subject<T> {
                     options.updateIfStrictlyEqual :
                     DEFAULT_UPDATE_IF_STRICTLY_EQUAL,
         }
-        this.subscriberId = 0
         this.value = initialValue
         this.subscribers = new Map()
         this.debug = false
@@ -135,11 +132,7 @@ class Subject<T> {
         subscription: Subscription<T>
     ): SubscriptionHandle {
 
-        if (this.subscriberId === Number.MAX_SAFE_INTEGER) {
-            this.subscriberId = 0
-        }
-
-        const subscriptionId = `${new Date().getTime()}.${this.subscriberId++}`
+        const subscriptionId = Symbol(new Date().getTime())
         this.subscribers.set(subscriptionId, subscription)
 
         return {
@@ -157,11 +150,12 @@ class Subject<T> {
     };
 
     /**
-     * Unsubscribe a subscription.
-     * @param id string
+     * Unsubscribe a subscription. Returns a boolean indicating if the unsubscription was successful.
+     * @param id symbol
+     * @returns boolean
      */
-    unsubscribe(id: string) {
-        this.subscribers.delete(id)
+    unsubscribe(id: symbol) {
+        return this.subscribers.delete(id)
     };
 
     /**
@@ -169,7 +163,7 @@ class Subject<T> {
      */
     toggle() {
         if (typeof this.value === "boolean") {
-            this.next(!this.value as unknown as T)
+            this.me.next(!this.value as unknown as T)
         }
     };
 
@@ -177,8 +171,10 @@ class Subject<T> {
      * Unsubscribes all the subscribers.
      */
     complete() {
-        Object.keys(this.subscribers).forEach((key) => this.unsubscribe(key))
-    };
+        Array.from(this.subscribers.keys()).forEach((id) => {
+            this.me.unsubscribe(id)
+        })
+    }
 
     /**
      * A subscription that is called once, then unsubscribed automatically.

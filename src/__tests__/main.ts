@@ -177,13 +177,15 @@ describe('unsubscribe', () => {
         subject.next('c')
 
         expect(sub).toHaveBeenCalledTimes(1)
-        expect(Object.keys(subject.subscribers).length === 0)
+        expect(subject.subscribers.size).toBe(0)
     })
 
     test('complete', () => {
         const subject = new Subject('a')
+        const sub = () => null
+        subject.subscribe(sub)
         subject.complete()
-        expect(Object.keys(subject.subscribers).length === 0)
+        expect(subject.subscribers.size).toBe(0)
     })
 })
 

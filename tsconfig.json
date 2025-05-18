@@ -21,5 +21,8 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "moduleResolution": "node",
-  }
+  },
+  "exclude": [
+    "examples",
+  ]
 }
