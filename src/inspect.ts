@@ -10,7 +10,7 @@ const inspectStore = (store: Record<string, unknown>, keys: string[] = [], path 
         store[key] instanceof Subject &&
         (keys.includes(store[key].options.name || '') || keys.length === 0)
       ) {
-        store[key].subscribe((value: typeof Subject.prototype.value) => {
+        store[key].subscribe((value: ReturnType<typeof Subject.prototype.getValue>) => {
           const elapsed = new Date().getTime() - lastTime.getTime()
           const subject = store[key] as typeof Subject.prototype
           console.groupCollapsed(

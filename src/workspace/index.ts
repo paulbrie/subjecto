@@ -52,7 +52,7 @@ console.log('\n')
 console.log('\n----- Example 4 ----- custom debug function')
 value3.debug = function(nextValue) {
     console.log('incoming value is:', nextValue)
-    console.log('updated value:', this.value)
+    console.log('updated value:', this.getValue())
 }
 
 value3.nextPush("c")
