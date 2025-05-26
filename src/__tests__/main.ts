@@ -1,5 +1,5 @@
-import Subject from '../subject'
-import { ERROR_MESSAGES, DEFAULT_NAME, DEFAULT_UPDATE_IF_STRICTLY_EQUAL } from '../subject'
+import Subject, { ERROR_MESSAGES, DEFAULT_NAME, DEFAULT_UPDATE_IF_STRICTLY_EQUAL } from '../subject'
+import { SubjectInvalidValueError, SubjectNotAnArrayError } from '../errors'
 
 describe('instantiation', () => {
     test('assigns a value to the subject', () => {
@@ -27,6 +27,7 @@ describe('instantiation', () => {
         expect(subject.options).toStrictEqual({
             name: DEFAULT_NAME,
             updateIfStrictlyEqual: DEFAULT_UPDATE_IF_STRICTLY_EQUAL,
+            maxSubscribers: undefined,
         })
     })
 })
@@ -86,10 +87,10 @@ describe('assigning values', () => {
     })
 
     test('nextAssign: new object value', () => {
-        const subject = new Subject<null | { a: number, b: number }>(null!)
+        const subject = new Subject<{ a?: number, b?: number }>({})
         const newValue = { a: 1, b: 1 }
         subject.nextAssign(newValue)
-        expect(subject.value === newValue)
+        expect(subject.value).toEqual(newValue) // Use toEqual for object comparison
     })
 
     test('nextAssign: update', () => {
@@ -103,8 +104,10 @@ describe('assigning values', () => {
         try {
             // @ts-expect-error bad type
             subject.nextAssign(100)
-        } catch (err) {
-            expect(err === ERROR_MESSAGES.VALUE_NOT_OBJECT && subject.value === "a")
+        } catch (err: any) {
+            expect(err instanceof SubjectInvalidValueError).toBe(true)
+            expect(err.message).toBe(ERROR_MESSAGES.VALUE_NOT_OBJECT)
+            expect(subject.value).toBe("a")
         }
     })
 
@@ -118,8 +121,10 @@ describe('assigning values', () => {
         const subject = new Subject('a')
         try {
             subject.nextPush(100)
-        } catch (err) {
-            expect(err === ERROR_MESSAGES.VALUE_NOT_ARRAY && subject.value === "a")
+        } catch (err: any) {
+            expect(err instanceof SubjectNotAnArrayError).toBe(true)
+            expect(err.message).toBe(ERROR_MESSAGES.VALUE_NOT_ARRAY)
+            expect(subject.value).toBe("a")
         }
     })
 
