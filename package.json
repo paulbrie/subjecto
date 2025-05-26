@@ -7,7 +7,7 @@
     "prepare": "if [ -d 'dist' ]; then rm -rf dist && npm run build; fi",
     "watch": "tsc --watch",
     "build": "tsc -b ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json",
-    "test": "jest",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "lint": "eslint",
     "docs:generate": "typedoc --out docs/api src/index.ts"
   },
