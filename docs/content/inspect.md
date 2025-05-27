@@ -28,4 +28,4 @@ Once enabled, you'll see in your console the flow of all the data changes occurr
 
 Output example:
 
-![Docusaurus logo](/img/inspect-example.png)
+![Docusaurus logo](../images/inspect-example.png)

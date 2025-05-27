@@ -1,6 +1,5 @@
 ---
 title: Debug a subject
-slug: /debug-a-subject
 sidebar_label: Debug
 ---
 

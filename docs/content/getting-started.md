@@ -1,6 +1,5 @@
 ---
 title: Getting Started
-slug: /
 ---
 
 ## Install Subjecto
