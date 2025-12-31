@@ -1,6 +1,6 @@
 {
   "name": "subjecto",
-  "version": "0.0.57",
+  "version": "0.0.59",
   "description": "A minimalistic state management library",
   "types": "dist/types/index.d.ts",
   "scripts": {
@@ -22,14 +22,19 @@
     "preset": "ts-jest",
     "testEnvironment": "node",
     "testRegex": "(/src/__tests__/.*|(\\.|/)(test|spec))\\.[jt]sx?$",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ],
     "collectCoverage": true,
     "collectCoverageFrom": [
-      "**/src/subject.ts"
+      "**/src/subject.ts",
+      "**/src/deepSubject.ts"
     ]
   },
   "repository": {
     "type": "git",
-    "url": "github.com/paulbrie/subjecto"
+    "url": "https://github.com/paulbrie/subjecto"
   },
   "keywords": [
     "state",

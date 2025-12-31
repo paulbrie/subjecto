@@ -1,5 +1,6 @@
 import Subject from "./subject"
-import Inspect from "./inspect"
 import { DeepSubject } from "./deepSubject"
 
-export { Subject, Inspect, DeepSubject }
+export { Subject, DeepSubject }
+export * from './subject';
+export * from './deepSubject';

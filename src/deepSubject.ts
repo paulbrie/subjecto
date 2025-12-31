@@ -1,8 +1,13 @@
+export type DeepSubjectSubscription = (value: unknown) => void;
 import { DEFAULT_NAME, DEFAULT_UPDATE_IF_STRICTLY_EQUAL } from './subject';
 
 export type Path = string;
 export type DeepValue = object;
-export type SubscriptionHandle = {
+/**
+ * Handle returned by DeepSubject.subscribe for unsubscribing from updates.
+ * @public
+ */
+export type DeepSubscriptionHandle = {
     unsubscribe: () => void;
 };
 
@@ -11,7 +16,9 @@ export interface DeepSubjectConstructorOptions {
     updateIfStrictlyEqual?: boolean;
 }
 
-export type Subscription<T> = (value: T | undefined) => void;
+/**
+ * Callback function for DeepSubject subscriptions.
+ */
 
 function matchPath(pattern: string, path: string): boolean {
     const patternParts = pattern.split('/');
@@ -46,9 +53,11 @@ function matchPath(pattern: string, path: string): boolean {
     return i === patternParts.length && j === pathParts.length;
 }
 
+export { matchPath };
+
 export class DeepSubject<T extends DeepValue> {
     private value: T;
-    private subscribers: Map<Path, Set<Subscription<DeepValue>>>;
+    private subscribers: Map<Path, Set<DeepSubjectSubscription>>;
     private proxyCache: WeakMap<object, object>;
     private options: DeepSubjectConstructorOptions;
     /**
@@ -59,6 +68,10 @@ export class DeepSubject<T extends DeepValue> {
      * A function that is called before the value changes. Can be used to check/process/format the new value before updating the subscribers.
      */
     before: (nextValue: T) => T;
+    /**
+     * Count the number of value updates.
+     */
+    count: number;
 
     constructor(initialValue: T, options?: DeepSubjectConstructorOptions) {
         this.value = initialValue;
@@ -71,6 +84,7 @@ export class DeepSubject<T extends DeepValue> {
         this.debug = false;
         this.before = (nextValue) => nextValue;
         this.setupProxy();
+        this.count = 1;
     }
 
     private setupProxy() {
@@ -83,10 +97,11 @@ export class DeepSubject<T extends DeepValue> {
                 return value;
             },
             set: (target: T, prop: string | symbol, value: unknown) => {
+                let proxiedValue = value;
                 if (value && typeof value === 'object') {
-                    value = this.createProxy(value, prop.toString());
+                    proxiedValue = this.createProxy(value, prop.toString());
                 }
-                target[prop as keyof T] = value as T[keyof T];
+                target[prop as keyof T] = proxiedValue as T[keyof T];
                 this.notifySubscribers(prop.toString());
                 return true;
             }
@@ -103,16 +118,28 @@ export class DeepSubject<T extends DeepValue> {
         const handler: ProxyHandler<object> = {
             get: (target: object, prop: string | symbol) => {
                 const value = target[prop as keyof typeof target];
+                // If value is an object, proxy it
                 if (value && typeof value === 'object') {
                     return this.createProxy(value, `${parentPath}/${prop.toString()}`);
+                }
+                // If target is an array and prop is a mutating method, wrap it
+                if (Array.isArray(target) && typeof prop === 'string' && [
+                    'push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'
+                ].includes(prop)) {
+                    return (...args: unknown[]): unknown => {
+                        const result = (value as (...args: unknown[]) => unknown).apply(target, args);
+                        this.notifySubscribers(parentPath);
+                        return result;
+                    };
                 }
                 return value;
             },
             set: (target: object, prop: string | symbol, value: unknown) => {
+                let proxiedValue = value;
                 if (value && typeof value === 'object') {
-                    value = this.createProxy(value, `${parentPath}/${prop.toString()}`);
+                    proxiedValue = this.createProxy(value, `${parentPath}/${prop.toString()}`);
                 }
-                target[prop as keyof typeof target] = value as typeof target[keyof typeof target];
+                target[prop as keyof typeof target] = proxiedValue as typeof target[keyof typeof target];
                 this.notifySubscribers(`${parentPath}/${prop.toString()}`);
                 return true;
             }
@@ -201,7 +228,7 @@ export class DeepSubject<T extends DeepValue> {
         return current;
     }
 
-    subscribe(pattern: Path, subscriber: Subscription<DeepValue>): SubscriptionHandle {
+    subscribe(pattern: Path, subscriber: DeepSubjectSubscription): DeepSubscriptionHandle {
         if (!this.subscribers.has(pattern)) {
             this.subscribers.set(pattern, new Set());
         }
@@ -243,6 +270,7 @@ export class DeepSubject<T extends DeepValue> {
         }
 
         this.value = this.before(nextValue);
+        this.count++;
 
         for (const [pattern, subscribers] of Array.from(this.subscribers.entries())) {
             const value = this.getValueAtPath(pattern);
@@ -268,6 +296,19 @@ export class DeepSubject<T extends DeepValue> {
                     this,
                     "\n"
                 );
+            }
+        }
+    }
+
+    /**
+     * Unsubscribe a callback from all paths/patterns.
+     * @param subscriber The callback function to remove from all subscriptions.
+     */
+    unsubscribe(subscriber: DeepSubjectSubscription): void {
+        for (const [pattern, subscribers] of Array.from(this.subscribers.entries())) {
+            subscribers.delete(subscriber);
+            if (subscribers.size === 0) {
+                this.subscribers.delete(pattern);
             }
         }
     }

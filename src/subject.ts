@@ -1,13 +1,12 @@
-export type Subscription<T> = (value: T) => void;
+export type SubjectSubscription<T> = (value: T) => void;
 export type SubscriptionHandle = {
     unsubscribe: () => void
     id: symbol
 };
 
-interface SubjectConstructorOptions {
+export interface SubjectConstructorOptions {
     name?: string
     updateIfStrictlyEqual?: boolean
-    maxSubscribers?: number
 }
 
 // defaults
@@ -30,21 +29,17 @@ export class Subject<T> {
     /**
      * The list of all the subscribers
      */
-    subscribers: Map<symbol, Subscription<T>>
+    subscribers: Map<symbol, SubjectSubscription<T>>
     /**
      * Enables debug logs
-     * 
-     * @param boolean
      */
     debug: boolean | ((nextValue: T) => void)
     /**
      * A function that is called before the value changes. Can be used to check/process/format the new value before updating the subscribers.  
-     * 
-     * @param nextValue <T>
      */
     before: (nextValue: T) => T
     /**
-     * Count the number of value upates.
+     * Count the number of value updates.
      */
     count: number
     /**
@@ -56,9 +51,11 @@ export class Subject<T> {
     constructor(initialValue: T, options?: SubjectConstructorOptions) {
         this.me = this
         this.options = {
-            name: typeof options === 'object' ? options?.name : DEFAULT_NAME,
+            name: typeof options === 'object' && options !== null
+                ? (options.name !== undefined ? options.name : DEFAULT_NAME)
+                : DEFAULT_NAME,
             updateIfStrictlyEqual:
-                typeof options === 'object' && typeof options.updateIfStrictlyEqual === 'boolean' ?
+                typeof options === 'object' && options !== null && typeof options.updateIfStrictlyEqual === 'boolean' ?
                     options.updateIfStrictlyEqual :
                     DEFAULT_UPDATE_IF_STRICTLY_EQUAL,
         }
@@ -81,8 +78,7 @@ export class Subject<T> {
 
 
     /**
-     * Assing a new value to the subject.
-     * @para newValue <T>
+     * Assign a new value to the subject.
      */
     next(nextValue: T) {
         if (!this.options.updateIfStrictlyEqual && this.value === nextValue) {
@@ -104,7 +100,7 @@ export class Subject<T> {
                 console.log(`\n--- SUBJECTO DEBUG: \`${this.options.name}\` ---`)
                 console.log(` ├ nextValue:`, nextValue)
                 console.log(
-                    ` └ subscribers(${Object.keys(this.subscribers).length}): `,
+                    ` └ subscribers(${this.subscribers.size}): `,
                     this,
                     "\n"
                 )
@@ -114,7 +110,6 @@ export class Subject<T> {
 
     /**
      * Push a new item to the subject if it is an array.
-     * @para value <unknown>
      */
     nextPush(value: unknown) {
         if (!Array.isArray(this.value)) {
@@ -125,11 +120,9 @@ export class Subject<T> {
 
     /**
      * Subscribe to the subject.
-     * @param subscription <Subscription<T>>
-     * @returns <SubscriptionHandle>
      */
     subscribe(
-        subscription: Subscription<T>
+        subscription: SubjectSubscription<T>
     ): SubscriptionHandle {
         const id = Symbol('subscriber');
         this.subscribers.set(id, subscription);
@@ -150,8 +143,6 @@ export class Subject<T> {
 
     /**
      * Unsubscribe a subscription. Returns a boolean indicating if the unsubscription was successful.
-     * @param id symbol
-     * @returns boolean
      */
     unsubscribe(id: symbol) {
         return this.subscribers.delete(id)
@@ -177,30 +168,18 @@ export class Subject<T> {
 
     /**
      * A subscription that is called once, then unsubscribed automatically.
-     * @param subscription Susbcription<T>
      */
-    once(subscription: Subscription<T>): void {
+    once(subscription: SubjectSubscription<T>): void {
         const id = Symbol('subscriber-once');
         this.subscribers.set(id, (value: T) => {
             subscription(value);
             this.unsubscribe(id);
         });
         // Immediately call with the current value
-        this.subscribers.get(id)?.(this.value);
-    };
-
-    /**
-     * A placeholder wrapper function that can be overriden to provide custom behavior without having to override the entire class.
-     * 
-     * Documentation provides an example for how to use this as React hook.
-     * 
-     * @param defaultValue<T>
-     */
-    hook(defaultValue?: T) {
-        if (defaultValue) {
-            this.next(defaultValue)
+        const subscriber = this.subscribers.get(id);
+        if (subscriber) {
+            subscriber(this.value);
         }
-        return this.value
     };
 
     getValue(): T {
