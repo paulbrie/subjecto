@@ -870,21 +870,21 @@ For most applications, performance is excellent. If you have thousands of subscr
   const value = subject.getValue();
   ```
 
-- `Subject.hook()` has been removed. Use React's `useExternalStore` hook instead (see React Integration section below).
+- `Subject.hook()` has been removed. Use React's `useSyncExternalStore` hook instead (see React Integration section below).
 
 ## React Integration
 
-Subjecto works seamlessly with React using the built-in `useExternalStore` hook (available in React 18+). This hook is designed specifically for subscribing to external stores like Subjecto.
+Subjecto works seamlessly with React using the built-in `useSyncExternalStore` hook (available in React 18+). This hook is designed specifically for subscribing to external stores like Subjecto.
 
 ### Requirements
 
 - React 18.0 or higher
-- `useExternalStore` is available from `react` (no additional packages needed)
+- `useSyncExternalStore` is available from `react` (no additional packages needed)
 
 ### Basic Usage with Subject
 
 ```typescript
-import { useExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { Subject } from "subjecto";
 
 // Create a subject outside your component
@@ -892,8 +892,11 @@ const countSubject = new Subject<number>(0);
 
 function Counter() {
   // Subscribe to the subject
-  const count = useExternalStore(
-    countSubject.subscribe.bind(countSubject),
+  const count = useSyncExternalStore(
+    (onStoreChange) => {
+      const handle = countSubject.subscribe(onStoreChange);
+      return () => handle.unsubscribe();
+    },
     () => countSubject.getValue()
   );
 
@@ -911,7 +914,7 @@ function Counter() {
 ### Using with DeepSubject
 
 ```typescript
-import { useExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { DeepSubject } from "subjecto";
 
 // Create a deep subject outside your component
@@ -924,8 +927,11 @@ const appState = new DeepSubject({
 
 function UserProfile() {
   // Subscribe to a specific path
-  const userName = useExternalStore(
-    (callback) => appState.subscribe("user/name", callback).unsubscribe,
+  const userName = useSyncExternalStore(
+    (onStoreChange) => {
+      const handle = appState.subscribe("user/name", onStoreChange);
+      return () => handle.unsubscribe();
+    },
     () => {
       const state = appState.getValue();
       return state.user.name;
@@ -952,12 +958,15 @@ function UserProfile() {
 For better reusability, create a custom hook:
 
 ```typescript
-import { useExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { Subject } from "subjecto";
 
 function useSubject<T>(subject: Subject<T>): [T, (value: T) => void] {
-  const value = useExternalStore(
-    subject.subscribe.bind(subject),
+  const value = useSyncExternalStore(
+    (onStoreChange) => {
+      const handle = subject.subscribe(onStoreChange);
+      return () => handle.unsubscribe();
+    },
     () => subject.getValue()
   );
 
@@ -982,15 +991,18 @@ function Counter() {
 ### Custom Hook for DeepSubject
 
 ```typescript
-import { useExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { DeepSubject } from "subjecto";
 
 function useDeepSubject<T extends object>(
   subject: DeepSubject<T>,
   path: string
 ): unknown {
-  return useExternalStore(
-    (callback) => subject.subscribe(path, callback).unsubscribe,
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const handle = subject.subscribe(path, onStoreChange);
+      return () => handle.unsubscribe();
+    },
     () => {
       const parts = path.split("/");
       let value: any = subject.getValue();
@@ -1017,7 +1029,7 @@ function UserName() {
 ### Complete Example: Todo App
 
 ```typescript
-import { useExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { Subject } from "subjecto";
 
 interface Todo {
@@ -1029,8 +1041,11 @@ interface Todo {
 const todosSubject = new Subject<Todo[]>([]);
 
 function TodoApp() {
-  const todos = useExternalStore(
-    todosSubject.subscribe.bind(todosSubject),
+  const todos = useSyncExternalStore(
+    (onStoreChange) => {
+      const handle = todosSubject.subscribe(onStoreChange);
+      return () => handle.unsubscribe();
+    },
     () => todosSubject.getValue()
   );
 
@@ -1065,7 +1080,7 @@ function TodoApp() {
 For better performance, subscribe only to the data you need:
 
 ```typescript
-import { useExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { DeepSubject } from "subjecto";
 
 const appState = new DeepSubject({
@@ -1075,8 +1090,11 @@ const appState = new DeepSubject({
 
 function UserName() {
   // Only re-renders when user.name changes
-  const name = useExternalStore(
-    (callback) => appState.subscribe("user/name", callback).unsubscribe,
+  const name = useSyncExternalStore(
+    (onStoreChange) => {
+      const handle = appState.subscribe("user/name", onStoreChange);
+      return () => handle.unsubscribe();
+    },
     () => appState.getValue().user.name
   );
 
@@ -1085,8 +1103,11 @@ function UserName() {
 
 function CartCount() {
   // Only re-renders when cart.items changes
-  const itemCount = useExternalStore(
-    (callback) => appState.subscribe("cart/items", callback).unsubscribe,
+  const itemCount = useSyncExternalStore(
+    (onStoreChange) => {
+      const handle = appState.subscribe("cart/items", onStoreChange);
+      return () => handle.unsubscribe();
+    },
     () => appState.getValue().cart.items.length
   );
 
@@ -1099,7 +1120,7 @@ function CartCount() {
 The hooks work perfectly with TypeScript:
 
 ```typescript
-import { useExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { Subject } from "subjecto";
 
 interface User {
@@ -1110,8 +1131,11 @@ interface User {
 const userSubject = new Subject<User | null>(null);
 
 function UserDisplay() {
-  const user = useExternalStore(
-    userSubject.subscribe.bind(userSubject),
+  const user = useSyncExternalStore(
+    (onStoreChange) => {
+      const handle = userSubject.subscribe(onStoreChange);
+      return () => handle.unsubscribe();
+    },
     () => userSubject.getValue()
   );
 
@@ -1147,8 +1171,11 @@ function UserDisplay() {
 
 3. **Memoize selectors**: For complex derived values
    ```typescript
-   const expensiveValue = useExternalStore(
-     subject.subscribe.bind(subject),
+   const expensiveValue = useSyncExternalStore(
+     (onStoreChange) => {
+       const handle = subject.subscribe(onStoreChange);
+       return () => handle.unsubscribe();
+     },
      () => {
        const value = subject.getValue();
        return expensiveComputation(value);
@@ -1158,15 +1185,18 @@ function UserDisplay() {
 
 ### Server-Side Rendering (SSR)
 
-`useExternalStore` handles SSR automatically. Make sure to provide a consistent initial value:
+`useSyncExternalStore` handles SSR automatically. Make sure to provide a consistent initial value:
 
 ```typescript
 // Works with Next.js, Remix, etc.
 const stateSubject = new Subject(initialState);
 
 function Component() {
-  const state = useExternalStore(
-    stateSubject.subscribe.bind(stateSubject),
+  const state = useSyncExternalStore(
+    (onStoreChange) => {
+      const handle = stateSubject.subscribe(onStoreChange);
+      return () => handle.unsubscribe();
+    },
     () => stateSubject.getValue()
   );
   // ...
