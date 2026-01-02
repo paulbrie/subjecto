@@ -2,7 +2,6 @@
   <img src="./src/logo.svg" alt="Subjecto Logo" width="120" />
 </p>
 
-[![CircleCI](https://circleci.com/gh/paulbrie/subjecto.svg?style=shield)](https://circleci.com/gh/paulbrie/subjecto)
 ![npm](https://img.shields.io/npm/dm/subjecto)
 
 # Subjecto
