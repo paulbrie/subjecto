@@ -3,6 +3,9 @@
 </p>
 
 ![npm](https://img.shields.io/npm/dm/subjecto)
+![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
+![Bundle Size](https://img.shields.io/bundlephobia/minzip/subjecto)
+![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue)
 
 # Subjecto
 
