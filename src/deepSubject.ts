@@ -228,23 +228,29 @@ export class DeepSubject<T extends DeepValue> {
         return current;
     }
 
-    subscribe(pattern: Path, subscriber: DeepSubjectSubscription): DeepSubscriptionHandle {
+    subscribe(
+        pattern: Path,
+        subscriber: DeepSubjectSubscription,
+        options?: { skipInitialCall?: boolean }
+    ): DeepSubscriptionHandle {
         if (!this.subscribers.has(pattern)) {
             this.subscribers.set(pattern, new Set());
         }
         this.subscribers.get(pattern)!.add(subscriber);
 
-        // Notify immediately with the current value
-        let value: DeepValue | undefined;
-        if (pattern === '**') {
-            value = this.value;
-        } else {
-            value = this.getValueAtPath(pattern);
-        }
-        try {
-            subscriber(value);
-        } catch (error) {
-            console.error('Error in subscriber:', error);
+        // Notify immediately with the current value (unless skipInitialCall is true)
+        if (!options?.skipInitialCall) {
+            let value: DeepValue | undefined;
+            if (pattern === '**') {
+                value = this.value;
+            } else {
+                value = this.getValueAtPath(pattern);
+            }
+            try {
+                subscriber(value);
+            } catch (error) {
+                console.error('Error in subscriber:', error);
+            }
         }
 
         return {

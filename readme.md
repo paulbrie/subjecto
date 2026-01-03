@@ -17,12 +17,30 @@ A minimalistic, zero-dependency JavaScript state management library built with T
   - [Subject](#subject)
   - [DeepSubject](#deepsubject)
 - [Usage Examples](#usage-examples)
+  - [Example 8: Using Built-in React Hooks](#example-8-using-built-in-react-hooks)
 - [Advanced Topics](#advanced-topics)
+  - [Path Patterns in DeepSubject](#path-patterns-in-deepsubject)
+  - [Performance Comparison](#performance-comparison)
+  - [Error Handling](#error-handling)
+  - [Memory Management](#memory-management)
+  - [Circular References](#circular-references)
 - [TypeScript Support](#typescript-support)
+  - [Type Exports](#type-exports)
+  - [Advanced Type Utilities](#advanced-type-utilities-react-integration)
 - [Best Practices](#best-practices)
 - [Performance Considerations](#performance-considerations)
 - [Migration Guide](#migration-guide)
 - [React Integration](#react-integration)
+  - [Built-in React Hooks](#built-in-react-hooks)
+  - [useSubject](#usesubjectt)
+  - [useDeepSubject](#usedeepsubjectt-p)
+  - [useDeepSubjectSelector](#usedeepsubjectselectort-p-r)
+  - [Understanding useSyncExternalStore](#understanding-usesyncexternalstore-advanced)
+  - [Performance Tips for React](#performance-tips-for-react)
+  - [Server-Side Rendering (SSR)](#server-side-rendering-ssr)
+- [Troubleshooting](#troubleshooting)
+  - [Common Issues](#common-issues)
+  - [FAQ](#faq)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -97,18 +115,20 @@ handle.unsubscribe();
 
 ## Features
 
-- **Zero Dependencies**: No external dependencies, keeping your bundle size minimal
+- **Zero Dependencies**: No external dependencies, keeping your bundle size minimal (peer dependency on React 18+ for optional React hooks)
 - **Type Safety**: Fully typed with TypeScript, no `any` types used
 - **Two State Management Patterns**:
   - **Subject**: Simple value container with subscription pattern
   - **DeepSubject**: Deep reactive state with path-based subscriptions
-- **Path-based Subscriptions**: Subscribe to nested properties using string paths
+- **Built-in React Hooks**: First-class React integration with type-safe hooks (`useSubject`, `useDeepSubject`, `useDeepSubjectSelector`)
+- **Path-based Subscriptions**: Subscribe to nested properties using string paths with full TypeScript inference
 - **Wildcard Support**: Use `*` and `**` patterns for flexible subscriptions
 - **Automatic Change Detection**: DeepSubject automatically detects nested mutations
 - **Error Resilient**: Subscriber errors don't break other subscriptions
 - **Debug Support**: Built-in debugging capabilities
 - **Memory Efficient**: Uses WeakMap for proxy caching, preventing memory leaks
 - **Circular Reference Safe**: Handles circular references gracefully
+- **SSR Compatible**: Works seamlessly with server-side rendering (Next.js, Remix, etc.)
 
 ## API Reference
 
@@ -127,7 +147,7 @@ new Subject<T>(initialValue: T, options?: SubjectConstructorOptions)
 - `initialValue` (required): The initial value of the subject
 - `options` (optional): Configuration object
   - `name?: string` - Custom name for debugging (default: `'noName'`)
-  - `updateIfStrictlyEqual?: boolean` - Whether to notify subscribers when the new value is strictly equal (`===`) to the current value (default: `true`)
+  - `updateIfStrictlyEqual?: boolean` - When `true` (default), subscribers are notified even when the new value is strictly equal (`===`) to the old value. Set to `false` to skip notifications for equal values, which can improve performance when you know the value hasn't meaningfully changed
 
 **Example:**
 
@@ -301,7 +321,7 @@ The options passed to the constructor.
 
 ##### `me: Subject<T>`
 
-Self-reference to the subject instance. Useful in certain edge cases.
+Self-reference to the subject instance. This property returns the Subject itself and can be useful for method chaining or passing the subject instance as a parameter while maintaining type safety.
 
 ---
 
@@ -338,14 +358,16 @@ const state = new DeepSubject(
 
 #### Methods
 
-##### `subscribe(pattern: Path, subscriber: DeepSubjectSubscription): DeepSubscriptionHandle`
+##### `subscribe(pattern: Path, subscriber: DeepSubjectSubscription, options?: SubscribeOptions): DeepSubscriptionHandle`
 
-Subscribe to changes at a specific path or pattern. The subscriber is immediately called with the current value at that path.
+Subscribe to changes at a specific path or pattern. By default, the subscriber is immediately called with the current value at that path.
 
 **Parameters:**
 
 - `pattern`: A path string (e.g., `"user/name"`) or pattern with wildcards (`"user/*"`, `"user/**"`)
 - `subscriber`: A function that receives the value when it changes
+- `options` (optional): Configuration object
+  - `skipInitialCall?: boolean` - When `true`, the subscriber will not be called immediately with the current value. This is useful when integrating with React's `useSyncExternalStore` to avoid duplicate renders. Default: `false`
 
 **Returns:** A `DeepSubscriptionHandle` object with:
 
@@ -362,6 +384,11 @@ Subscribe to changes at a specific path or pattern. The subscriber is immediatel
 - `"user/*"` - Subscribe to any direct child of `user` (e.g., `user.name`, `user.age`)
 - `"user/**"` - Subscribe to any descendant of `user` at any depth
 - `"**"` - Subscribe to all changes in the entire object
+
+**Important Notes:**
+
+- Array index subscriptions (e.g., `"cart/items/0"`) are not supported. Subscribe to the array itself (`"cart/items"`) or use wildcard patterns (`"cart/**"`) instead
+- When subscribing to nested object paths (e.g., `"user/profile"`), changes to deeper properties (e.g., `"user/profile/bio"`) will not trigger the subscription unless you use a wildcard pattern (e.g., `"user/profile/**"`)
 
 **Example:**
 
@@ -681,6 +708,139 @@ fetchData().then(() => {
 });
 ```
 
+### Example 8: Using Built-in React Hooks
+
+Subjecto provides first-class React integration with built-in, type-safe hooks:
+
+```typescript
+import { Subject, DeepSubject } from "subjecto";
+import {
+  useSubject,
+  useDeepSubject,
+  useDeepSubjectSelector,
+} from "subjecto/react";
+
+// Create subjects outside components
+const counterSubject = new Subject(0);
+const appState = new DeepSubject({
+  user: {
+    name: "Alice",
+    profile: {
+      bio: "Software Engineer",
+      location: "San Francisco",
+    },
+  },
+  cart: {
+    items: [] as Array<{ id: number; name: string; price: number }>,
+  },
+});
+
+// Simple counter with useSubject
+function Counter() {
+  const [count, setCount] = useSubject(counterSubject);
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>Increment</button>
+      <button onClick={() => setCount(0)}>Reset</button>
+    </div>
+  );
+}
+
+// Subscribe to specific nested path with useDeepSubject
+function UserName() {
+  // TypeScript knows this returns string
+  const name = useDeepSubject(appState, "user/name");
+
+  return (
+    <div>
+      <h3>User: {name}</h3>
+      <button
+        onClick={() => {
+          appState.getValue().user.name = "Bob";
+        }}
+      >
+        Change Name
+      </button>
+    </div>
+  );
+}
+
+// Subscribe to nested object with useDeepSubject
+function UserProfile() {
+  // TypeScript knows this returns { bio: string; location: string }
+  const profile = useDeepSubject(appState, "user/profile");
+
+  return (
+    <div>
+      <p>Bio: {profile.bio}</p>
+      <p>Location: {profile.location}</p>
+      <button
+        onClick={() => {
+          // Changes to nested properties trigger updates
+          appState.getValue().user.profile.bio = "Senior Engineer";
+        }}
+      >
+        Update Bio
+      </button>
+    </div>
+  );
+}
+
+// Computed/derived values with useDeepSubjectSelector
+function CartSummary() {
+  // Subscribe to cart items and compute total
+  const total = useDeepSubjectSelector(appState, "cart/items", (items) =>
+    items.reduce((sum, item) => sum + item.price, 0)
+  );
+
+  const itemCount = useDeepSubjectSelector(
+    appState,
+    "cart/items",
+    (items) => items.length
+  );
+
+  return (
+    <div>
+      <p>Items: {itemCount}</p>
+      <p>Total: ${total.toFixed(2)}</p>
+      <button
+        onClick={() => {
+          appState.getValue().cart.items.push({
+            id: Date.now(),
+            name: "Product",
+            price: 10,
+          });
+        }}
+      >
+        Add Item
+      </button>
+    </div>
+  );
+}
+
+// App component using all hooks
+function App() {
+  return (
+    <div>
+      <Counter />
+      <UserName />
+      <UserProfile />
+      <CartSummary />
+    </div>
+  );
+}
+```
+
+**Key Benefits:**
+
+- **Type Safety**: Full TypeScript inference for paths and return types
+- **Performance**: Only re-renders when subscribed data changes
+- **Automatic Cleanup**: Subscriptions are cleaned up on unmount
+- **SSR Compatible**: Works with Next.js, Remix, etc.
+- **Nested Change Detection**: Uses wildcard patterns internally to catch all nested changes
+
 ## Advanced Topics
 
 ### Path Patterns in DeepSubject
@@ -714,6 +874,23 @@ Subscribe to all changes:
 // Matches everything
 state.subscribe("**", callback);
 ```
+
+#### Performance Comparison
+
+Different subscription patterns have different performance characteristics:
+
+| Pattern | Description | Performance | Use When |
+|---------|-------------|-------------|----------|
+| Exact path<br/>`"user/name"` | Single specific property | ⚡⚡⚡ Fastest | You need only one specific value |
+| Single wildcard<br/>`"user/*"` | Direct children only | ⚡⚡ Fast | You need any direct child property |
+| Deep wildcard<br/>`"user/**"` | Any descendant at any depth | ⚡ Moderate | You need any property within a subtree |
+| Root wildcard<br/>`"**"` | Everything in the object | 🐢 Slower | Global state tracking, debugging |
+
+**Best Practices:**
+- Use the most specific path possible for best performance
+- Avoid root wildcard (`**`) in production unless necessary
+- Single wildcards (`*`) are a good balance between flexibility and performance
+- Deep wildcards (`path/**`) are ideal for React hooks that need to detect all nested changes
 
 ### Error Handling
 
@@ -801,6 +978,57 @@ import {
 } from "subjecto";
 ```
 
+### Advanced Type Utilities (React Integration)
+
+When using the built-in React hooks, Subjecto provides advanced TypeScript utilities for path type inference:
+
+```typescript
+import type { Paths, PathValue } from "subjecto/react";
+
+interface AppState {
+  user: {
+    name: string;
+    age: number;
+    profile: {
+      bio: string;
+      location: string;
+    };
+  };
+  cart: {
+    items: Array<{ id: number; price: number }>;
+  };
+}
+
+// Paths<T> generates a union of all valid paths
+type ValidPaths = Paths<AppState>;
+// Result: "user" | "user/name" | "user/age" | "user/profile" |
+//         "user/profile/bio" | "user/profile/location" | "cart" | "cart/items"
+
+// PathValue<T, P> extracts the type at a given path
+type UserNameType = PathValue<AppState, "user/name">; // string
+type UserProfileType = PathValue<AppState, "user/profile">; // { bio: string; location: string }
+type CartItemsType = PathValue<AppState, "cart/items">; // Array<{ id: number; price: number }>
+```
+
+**How This Works:**
+
+The `useDeepSubject` hook uses these utilities to provide full type safety:
+
+```typescript
+const state = new DeepSubject<AppState>({...});
+
+// TypeScript knows this returns string
+const userName = useDeepSubject(state, "user/name");
+
+// TypeScript knows this returns { bio: string; location: string }
+const profile = useDeepSubject(state, "user/profile");
+
+// TypeScript error: Invalid path!
+const invalid = useDeepSubject(state, "user/invalid");
+```
+
+This ensures you can't subscribe to paths that don't exist, catching typos at compile time.
+
 ## Best Practices
 
 1. **Always Unsubscribe**: Clean up subscriptions to prevent memory leaks
@@ -874,107 +1102,44 @@ For most applications, performance is excellent. If you have thousands of subscr
 
 ## React Integration
 
-Subjecto works seamlessly with React using the built-in `useSyncExternalStore` hook (available in React 18+). This hook is designed specifically for subscribing to external stores like Subjecto.
+Subjecto provides **first-class React integration** with built-in, type-safe hooks. Simply install Subjecto and import the hooks from `subjecto/react`.
 
-### Requirements
+### Installation & Requirements
 
-- React 18.0 or higher
-- `useSyncExternalStore` is available from `react` (no additional packages needed)
-
-### Basic Usage with Subject
-
-```typescript
-import { useSyncExternalStore } from "react";
-import { Subject } from "subjecto";
-
-// Create a subject outside your component
-const countSubject = new Subject<number>(0);
-
-function Counter() {
-  // Subscribe to the subject
-  const count = useSyncExternalStore(
-    (onStoreChange) => {
-      const handle = countSubject.subscribe(onStoreChange);
-      return () => handle.unsubscribe();
-    },
-    () => countSubject.getValue()
-  );
-
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => countSubject.next(count + 1)}>
-        Increment
-      </button>
-    </div>
-  );
-}
+```bash
+npm install subjecto
 ```
 
-### Using with DeepSubject
+**Requirements:**
+- React 18.0 or higher (for `useSyncExternalStore` support)
+- TypeScript (recommended for full type safety)
 
+**Import:**
 ```typescript
-import { useSyncExternalStore } from "react";
-import { DeepSubject } from "subjecto";
-
-// Create a deep subject outside your component
-const appState = new DeepSubject({
-  user: {
-    name: "John",
-    age: 30,
-  },
-});
-
-function UserProfile() {
-  // Subscribe to a specific path
-  const userName = useSyncExternalStore(
-    (onStoreChange) => {
-      const handle = appState.subscribe("user/name", onStoreChange);
-      return () => handle.unsubscribe();
-    },
-    () => {
-      const state = appState.getValue();
-      return state.user.name;
-    }
-  );
-
-  return (
-    <div>
-      <p>Name: {userName}</p>
-      <button
-        onClick={() => {
-          appState.getValue().user.name = "Jane";
-        }}
-      >
-        Change Name
-      </button>
-    </div>
-  );
-}
+import { useSubject, useDeepSubject, useDeepSubjectSelector } from "subjecto/react";
 ```
 
-### Creating a Custom Hook
+---
 
-For better reusability, create a custom hook:
+## Built-in React Hooks
+
+### `useSubject<T>`
+
+Subscribe to a `Subject` and get its current value with a setter function, similar to React's `useState`.
+
+**Signature:**
+```typescript
+function useSubject<T>(subject: Subject<T>): [T, (value: T) => void]
+```
+
+**Example:**
 
 ```typescript
-import { useSyncExternalStore } from "react";
 import { Subject } from "subjecto";
+import { useSubject } from "subjecto/react";
 
-function useSubject<T>(subject: Subject<T>): [T, (value: T) => void] {
-  const value = useSyncExternalStore(
-    (onStoreChange) => {
-      const handle = subject.subscribe(onStoreChange);
-      return () => handle.unsubscribe();
-    },
-    () => subject.getValue()
-  );
-
-  return [value, (newValue: T) => subject.next(newValue)];
-}
-
-// Usage
-const countSubject = new Subject<number>(0);
+// Create subject outside component
+const countSubject = new Subject(0);
 
 function Counter() {
   const [count, setCount] = useSubject(countSubject);
@@ -983,225 +1148,329 @@ function Counter() {
     <div>
       <p>Count: {count}</p>
       <button onClick={() => setCount(count + 1)}>Increment</button>
+      <button onClick={() => setCount(0)}>Reset</button>
     </div>
   );
 }
 ```
 
-### Custom Hook for DeepSubject
+**Features:**
+- Returns `[value, setter]` tuple like `useState`
+- Automatic cleanup on unmount
+- Type-safe with full TypeScript inference
+
+---
+
+### `useDeepSubject<T, P>`
+
+Subscribe to a specific path in a `DeepSubject` with full type safety and automatic nested change detection.
+
+**Signature:**
+```typescript
+function useDeepSubject<T extends object, P extends Paths<T>>(
+  subject: DeepSubject<T>,
+  path: P
+): PathValue<T, P>
+```
+
+**Example:**
 
 ```typescript
-import { useSyncExternalStore } from "react";
 import { DeepSubject } from "subjecto";
+import { useDeepSubject } from "subjecto/react";
 
-function useDeepSubject<T extends object>(
-  subject: DeepSubject<T>,
-  path: string
-): unknown {
-  return useSyncExternalStore(
-    (onStoreChange) => {
-      const handle = subject.subscribe(path, onStoreChange);
-      return () => handle.unsubscribe();
-    },
-    () => {
-      const parts = path.split("/");
-      let value: any = subject.getValue();
-      for (const part of parts) {
-        value = value?.[part];
-      }
-      return value;
-    }
-  );
-}
-
-// Usage
 const appState = new DeepSubject({
-  user: { name: "John" },
+  user: {
+    name: "Alice",
+    profile: { bio: "Engineer", location: "SF" }
+  }
 });
 
 function UserName() {
+  // TypeScript infers return type as string
   const name = useDeepSubject(appState, "user/name");
-
-  return <p>Name: {name}</p>;
-}
-```
-
-### Complete Example: Todo App
-
-```typescript
-import { useSyncExternalStore } from "react";
-import { Subject } from "subjecto";
-
-interface Todo {
-  id: number;
-  text: string;
-  completed: boolean;
-}
-
-const todosSubject = new Subject<Todo[]>([]);
-
-function TodoApp() {
-  const todos = useSyncExternalStore(
-    (onStoreChange) => {
-      const handle = todosSubject.subscribe(onStoreChange);
-      return () => handle.unsubscribe();
-    },
-    () => todosSubject.getValue()
-  );
-
-  const addTodo = (text: string) => {
-    const newTodo: Todo = {
-      id: Date.now(),
-      text,
-      completed: false,
-    };
-    todosSubject.next([...todos, newTodo]);
-  };
-
-  const toggleTodo = (id: number) => {
-    todosSubject.next(
-      todos.map((todo) =>
-        todo.id === id ? { ...todo, completed: !todo.completed } : todo
-      )
-    );
-  };
 
   return (
     <div>
-      <TodoForm onAdd={addTodo} />
-      <TodoList todos={todos} onToggle={toggleTodo} />
+      <p>Name: {name}</p>
+      <button onClick={() => {
+        appState.getValue().user.name = "Bob";
+      }}>
+        Change Name
+      </button>
+    </div>
+  );
+}
+
+function UserProfile() {
+  // TypeScript infers return type as { bio: string; location: string }
+  const profile = useDeepSubject(appState, "user/profile");
+
+  return (
+    <div>
+      <p>Bio: {profile.bio}</p>
+      <p>Location: {profile.location}</p>
+      <button onClick={() => {
+        // Nested property changes are automatically detected!
+        appState.getValue().user.profile.bio = "Senior Engineer";
+      }}>
+        Update Bio
+      </button>
     </div>
   );
 }
 ```
 
-### Advanced: Selective Subscriptions
+**Features:**
+- **Type-safe paths**: TypeScript validates paths at compile time
+- **Nested change detection**: Uses wildcard subscriptions internally (`path/**`) to detect all nested property changes
+- **Automatic cleanup**: Unsubscribes on unmount
+- **Type inference**: Return type is automatically inferred from the path
 
-For better performance, subscribe only to the data you need:
+---
+
+### `useDeepSubjectSelector<T, P, R>`
+
+Subscribe to a path and compute a derived value with a selector function. Useful for complex calculations or data transformations.
+
+**Signature:**
+```typescript
+function useDeepSubjectSelector<T extends object, P extends Paths<T>, R>(
+  subject: DeepSubject<T>,
+  path: P,
+  selector: (value: PathValue<T, P>) => R
+): R
+```
+
+**Example:**
 
 ```typescript
-import { useSyncExternalStore } from "react";
 import { DeepSubject } from "subjecto";
+import { useDeepSubjectSelector } from "subjecto/react";
 
 const appState = new DeepSubject({
-  user: { name: "John", age: 30 },
-  cart: { items: [] },
+  cart: {
+    items: [] as Array<{ id: number; name: string; price: number }>
+  }
 });
 
-function UserName() {
-  // Only re-renders when user.name changes
-  const name = useSyncExternalStore(
-    (onStoreChange) => {
-      const handle = appState.subscribe("user/name", onStoreChange);
-      return () => handle.unsubscribe();
-    },
-    () => appState.getValue().user.name
+function CartSummary() {
+  // Compute total price
+  const total = useDeepSubjectSelector(
+    appState,
+    "cart/items",
+    (items) => items.reduce((sum, item) => sum + item.price, 0)
   );
 
-  return <p>{name}</p>;
-}
-
-function CartCount() {
-  // Only re-renders when cart.items changes
-  const itemCount = useSyncExternalStore(
-    (onStoreChange) => {
-      const handle = appState.subscribe("cart/items", onStoreChange);
-      return () => handle.unsubscribe();
-    },
-    () => appState.getValue().cart.items.length
+  // Compute item count
+  const count = useDeepSubjectSelector(
+    appState,
+    "cart/items",
+    (items) => items.length
   );
 
-  return <p>Items in cart: {itemCount}</p>;
+  return (
+    <div>
+      <p>Items: {count}</p>
+      <p>Total: ${total.toFixed(2)}</p>
+    </div>
+  );
 }
 ```
 
-### TypeScript Support
+**Features:**
+- **Memoized selectors**: Only recomputes when the input value changes
+- **Object comparison**: Uses JSON.stringify for object/array results to detect deep changes
+- **Type inference**: Result type is inferred from selector return type
 
-The hooks work perfectly with TypeScript:
+---
+
+## Understanding useSyncExternalStore (Advanced)
+
+Under the hood, the built-in hooks use React's `useSyncExternalStore` API. If you need custom behavior, you can implement your own hooks using this pattern:
 
 ```typescript
 import { useSyncExternalStore } from "react";
 import { Subject } from "subjecto";
 
-interface User {
-  id: number;
-  name: string;
-}
-
-const userSubject = new Subject<User | null>(null);
-
-function UserDisplay() {
-  const user = useSyncExternalStore(
+function useCustomSubject<T>(subject: Subject<T>): T {
+  return useSyncExternalStore(
     (onStoreChange) => {
-      const handle = userSubject.subscribe(onStoreChange);
+      // Subscribe with skipInitialCall to avoid duplicate renders
+      const handle = subject.subscribe(onStoreChange);
       return () => handle.unsubscribe();
     },
-    () => userSubject.getValue()
+    () => subject.getValue(),
+    () => subject.getValue() // Server snapshot for SSR
   );
-
-  if (!user) return <p>No user</p>;
-
-  return <p>Welcome, {user.name}!</p>;
 }
 ```
 
-### Performance Tips
+**Note:** The built-in hooks are recommended for most use cases as they handle edge cases and optimizations.
 
-1. **Create subjects outside components**: This prevents recreating them on every render
+---
 
+## Performance Tips for React
+
+1. **Create subjects outside components**
    ```typescript
-   // ✅ Good - outside component
-   const countSubject = new Subject(0);
+   // ✅ Good - created once
+   const counterSubject = new Subject(0);
 
-   // ❌ Bad - inside component (recreated every render)
    function Component() {
-     const countSubject = new Subject(0);
+     const [count] = useSubject(counterSubject);
+   }
+
+   // ❌ Bad - recreated on every render
+   function Component() {
+     const counterSubject = new Subject(0);
+     const [count] = useSubject(counterSubject);
    }
    ```
 
-2. **Use specific paths with DeepSubject**: Subscribe to the exact path you need
-
+2. **Use specific paths with DeepSubject**
    ```typescript
    // ✅ Good - specific path
-   useDeepSubject(state, "user/name");
+   const name = useDeepSubject(state, "user/name");
 
    // ❌ Less efficient - subscribes to everything
-   useDeepSubject(state, "**");
+   const everything = useDeepSubject(state, "**");
    ```
 
-3. **Memoize selectors**: For complex derived values
+3. **Use selectors for derived values**
    ```typescript
-   const expensiveValue = useSyncExternalStore(
-     (onStoreChange) => {
-       const handle = subject.subscribe(onStoreChange);
-       return () => handle.unsubscribe();
-     },
-     () => {
-       const value = subject.getValue();
-       return expensiveComputation(value);
-     }
+   // ✅ Good - only recomputes when items change
+   const total = useDeepSubjectSelector(state, "cart/items",
+     (items) => items.reduce((sum, i) => sum + i.price, 0)
    );
+
+   // ❌ Bad - recomputes on every render
+   function Component() {
+     const items = useDeepSubject(state, "cart/items");
+     const total = items.reduce((sum, i) => sum + i.price, 0);
+   }
    ```
 
-### Server-Side Rendering (SSR)
+---
 
-`useSyncExternalStore` handles SSR automatically. Make sure to provide a consistent initial value:
+## Server-Side Rendering (SSR)
+
+The built-in hooks work seamlessly with SSR frameworks like Next.js and Remix:
 
 ```typescript
 // Works with Next.js, Remix, etc.
-const stateSubject = new Subject(initialState);
+const userSubject = new Subject({ name: "Alice", age: 30 });
 
-function Component() {
-  const state = useSyncExternalStore(
-    (onStoreChange) => {
-      const handle = stateSubject.subscribe(onStoreChange);
-      return () => handle.unsubscribe();
-    },
-    () => stateSubject.getValue()
-  );
-  // ...
+function UserProfile() {
+  const [user] = useSubject(userSubject);
+
+  return <div>Welcome, {user.name}!</div>;
 }
 ```
+
+The hooks use `useSyncExternalStore` which handles SSR hydration automatically.
+
+---
+
+## Complete React Example
+
+For a comprehensive example using all three hooks (`useSubject`, `useDeepSubject`, `useDeepSubjectSelector`), see [Example 8: Using Built-in React Hooks](#example-8-using-built-in-react-hooks) in the Usage Examples section above.
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue: Component not re-rendering when state changes**
+
+Solution: Ensure you're calling `getValue()` on the subject to get the proxied object (for DeepSubject):
+
+```typescript
+// ✅ Correct
+appState.getValue().user.name = "New Name";
+
+// ❌ Won't trigger subscriptions
+const state = appState.getValue();
+state.user = { name: "New Name" }; // Replaces entire user object
+```
+
+**Issue: TypeScript errors with path subscriptions**
+
+Solution: Make sure your state interface matches your actual data structure:
+
+```typescript
+interface AppState {
+  user: {
+    name: string;
+  };
+}
+
+const state = new DeepSubject<AppState>({...});
+
+// ✅ TypeScript validates this path
+const name = useDeepSubject(state, "user/name");
+
+// ❌ TypeScript error - path doesn't exist
+const invalid = useDeepSubject(state, "user/invalid");
+```
+
+**Issue: Nested property changes not detected**
+
+The built-in hooks automatically handle this by using wildcard subscriptions internally. If you're implementing custom hooks, use the `path/**` pattern:
+
+```typescript
+// ✅ Detects nested changes
+const handle = subject.subscribe("user/profile/**", callback);
+
+// ❌ Won't detect changes to user.profile.bio
+const handle = subject.subscribe("user/profile", callback);
+```
+
+**Issue: Memory leaks**
+
+Solution: Always clean up subscriptions. The built-in React hooks handle this automatically, but if you're subscribing manually:
+
+```typescript
+useEffect(() => {
+  const handle = subject.subscribe(callback);
+  return () => handle.unsubscribe(); // Clean up!
+}, []);
+```
+
+**Issue: Performance problems with many subscribers**
+
+Solutions:
+- Use more specific paths instead of wildcards
+- Use `updateIfStrictlyEqual: false` for subjects that don't need strict equality checks
+- Consider batching state updates
+
+### FAQ
+
+**Q: Can I use Subjecto with React < 18?**
+
+A: No, the built-in hooks require React 18+ for `useSyncExternalStore`. For React 17 and below, you'll need to use the `use-sync-external-store` shim package.
+
+**Q: How does Subjecto compare to Redux/Zustand/Jotai?**
+
+A: Subjecto is lighter than Redux (~16KB vs ~40KB), has built-in nested reactivity unlike Zustand, and uses mutable updates like MobX but with explicit subscriptions. See the [performance comparison table](#performance-comparison) for more details.
+
+**Q: Can I use Subjecto for large applications?**
+
+A: Yes! The library is designed for production use with excellent performance. For very large apps, consider:
+- Breaking state into multiple smaller subjects
+- Using specific path subscriptions
+- Avoiding root wildcard (`**`) subscriptions in hot paths
+
+**Q: Does Subjecto support middleware?**
+
+A: Not built-in, but you can implement middleware using the `before` hook on subjects to transform/validate values before they're set.
+
+**Q: Can I use Subjecto outside of React?**
+
+A: Absolutely! Subjecto is framework-agnostic. The React hooks are optional. See the [Node.js examples](#example-1-form-state-management) for non-React usage.
+
+---
 
 ## Contributing
 

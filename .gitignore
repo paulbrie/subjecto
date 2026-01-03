@@ -4,3 +4,11 @@ node_modules
 coverage
 lcov.info
 dist
+
+# Internal documentation (should not be committed)
+AUDIT_REPORT.md
+DOCUMENTATION_REVIEW.md
+DOCUMENTATION_IMPROVEMENTS_APPLIED.md
+FIXES_APPLIED.md
+DISABLE_CHECKS.md
+*.md.bak

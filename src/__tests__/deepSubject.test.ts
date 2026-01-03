@@ -356,12 +356,12 @@ describe('DeepSubject additional coverage', () => {
 
     it('should trigger debug logging (boolean)', () => {
         const ds = new DeepSubject<{ a: number }>({ a: 1 }, { name: 'testDS' });
-        jest.spyOn(console, 'log').mockImplementation(() => {});
+        jest.spyOn(console, 'log').mockImplementation(() => { });
         ds.debug = true;
         const handler = jest.fn();
         ds.subscribe('a', handler);
         ds.next({ a: 2 });
-        
+
         expect(console.log).toHaveBeenCalledWith(
             expect.stringContaining('SUBJECTO DEBUG')
         );
@@ -412,7 +412,7 @@ describe('DeepSubject additional coverage', () => {
 
     it('should handle errors in subscribers gracefully', () => {
         const ds = new DeepSubject<{ a: number }>({ a: 1 });
-        jest.spyOn(console, 'error').mockImplementation(() => {});
+        jest.spyOn(console, 'error').mockImplementation(() => { });
         const errorHandler = jest.fn(() => { throw new Error('fail'); });
         const goodHandler = jest.fn();
         ds.subscribe('a', errorHandler);
@@ -425,7 +425,7 @@ describe('DeepSubject additional coverage', () => {
 
     it('should handle errors in subscribers in next() gracefully', () => {
         const ds = new DeepSubject<{ a: number }>({ a: 1 });
-        jest.spyOn(console, 'error').mockImplementation(() => {});
+        jest.spyOn(console, 'error').mockImplementation(() => { });
         const errorHandler = jest.fn(() => { throw new Error('fail'); });
         const goodHandler = jest.fn();
         ds.subscribe('a', errorHandler);
@@ -438,7 +438,7 @@ describe('DeepSubject additional coverage', () => {
 
     it('should handle errors in ** wildcard subscribers gracefully', () => {
         const ds = new DeepSubject<{ a: number }>({ a: 1 });
-        jest.spyOn(console, 'error').mockImplementation(() => {});
+        jest.spyOn(console, 'error').mockImplementation(() => { });
         const errorHandler = jest.fn(() => { throw new Error('fail'); });
         const goodHandler = jest.fn();
         ds.subscribe('**', errorHandler);
@@ -450,10 +450,10 @@ describe('DeepSubject additional coverage', () => {
     });
 
     it('should handle errors in wildcard pattern subscribers (with * pattern)', () => {
-        const ds = new DeepSubject<{ user: { name: string; age: number } }>({ 
-            user: { name: 'John', age: 30 } 
+        const ds = new DeepSubject<{ user: { name: string; age: number } }>({
+            user: { name: 'John', age: 30 }
         });
-        jest.spyOn(console, 'error').mockImplementation(() => {});
+        jest.spyOn(console, 'error').mockImplementation(() => { });
         const errorHandler = jest.fn(() => { throw new Error('fail'); });
         const goodHandler = jest.fn();
         ds.subscribe('user/*', errorHandler);
@@ -583,10 +583,10 @@ describe('DeepSubject edge and uncovered lines', () => {
 
     it('next: should call debug as true and log', () => {
         const ds = new DeepSubject<{ a: number }>({ a: 1 }, { name: 'testDS' });
-        jest.spyOn(console, 'log').mockImplementation(() => {});
+        jest.spyOn(console, 'log').mockImplementation(() => { });
         ds.debug = true;
         ds.next({ a: 2 });
-        
+
         expect(console.log).toHaveBeenCalled();
         (console.log as jest.Mock).mockRestore();
     });

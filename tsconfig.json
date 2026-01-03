@@ -22,7 +22,16 @@
     "declaration": true,
     "moduleResolution": "node"
   },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
   "exclude": [
     "examples",
+    "**/__tests__",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "node_modules",
+    "dist"
   ]
 }

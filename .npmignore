@@ -1,3 +1,29 @@
-coverage
+# Development files
 .replit
 .replit.nix
+src/
+tsconfig*.json
+eslint.config.mjs
+.prettierrc
+.prettierignore
+.husky/
+.github/
+
+# Test files
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+coverage/
+lcov.info
+
+# Build artifacts
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Misc
+.DS_Store

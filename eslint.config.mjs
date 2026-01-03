@@ -8,7 +8,7 @@ export default [
     files: ["**/*.{js,mjs,cjs,ts}"],
   },
   {
-    ignores: ["dist/", "docs/", "node_modules/", "coverage/"],
+    ignores: ["dist/", "docs/", "node_modules/", "coverage/", "examples/"],
   },
   { languageOptions: { globals: globals.browser } },
   pluginJs.configs.recommended,
