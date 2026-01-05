@@ -615,7 +615,7 @@ describe('DeepSubject count property', () => {
 describe('DeepSubject LRU cache eviction', () => {
     it('should evict oldest entry when cache exceeds 100 entries', () => {
         // Create a large nested object to trigger many path matches
-        const initialState: Record<string, any> = {};
+        const initialState: Record<string, { value: number }> = {};
         for (let i = 0; i < 110; i++) {
             initialState[`key${i}`] = { value: i };
         }
@@ -642,7 +642,7 @@ describe('DeepSubject LRU cache eviction', () => {
     });
 
     it('should still match paths correctly after cache eviction', () => {
-        const ds = new DeepSubject<Record<string, any>>({});
+        const ds = new DeepSubject<Record<string, { nested: number }>>({});
         const subscribers: Array<jest.Mock> = [];
 
         // Create 105 subscribers to force cache eviction

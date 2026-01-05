@@ -155,7 +155,7 @@ export function debugSubject<T>(
     `
 
     // Inject styles
-    injectStyles(darkMode)
+    injectStyles()
 
     // Add to container
     container.appendChild(wrapper)
@@ -509,7 +509,7 @@ export function debugSubject<T>(
             subject.next(newValue as T)
             valueEditor.value = ''
             showNotification('Value updated!')
-        } catch (error) {
+        } catch {
             showNotification('Invalid JSON', 'error')
         }
     }
@@ -646,7 +646,7 @@ function formatTime(date: Date): string {
     return `${time}.${ms}`
 }
 
-function injectStyles(darkMode: boolean) {
+function injectStyles() {
     const styleId = 'subjecto-debug-styles'
     if (document.getElementById(styleId)) return
 
