@@ -374,25 +374,32 @@ export function debugSubject<T>(
             ctx.fillText(value.toFixed(2), padding.left - 5, y + 4)
         }
 
-        // Vertical grid lines (time markers)
-        const timePoints = Math.min(5, dataPoints.length)
-        for (let i = 0; i < timePoints; i++) {
-            const idx = Math.floor((dataPoints.length - 1) * i / (timePoints - 1))
-            const point = dataPoints[idx]
-            const x = xScale(point.x)
+        // Vertical grid lines (time ticks)
+        const numTicks = 6
+        const timeRange = (xMax - xMin) / 1000 // in seconds
+        const tickInterval = Math.ceil(timeRange / (numTicks - 1))
 
-            ctx.strokeStyle = gridColor
-            ctx.beginPath()
-            ctx.moveTo(x, padding.top)
-            ctx.lineTo(x, height - padding.bottom)
-            ctx.stroke()
+        for (let i = 0; i < numTicks; i++) {
+            const secondsAgo = timeRange - (i * tickInterval)
+            const timestamp = now - (secondsAgo * 1000)
 
-            // X-axis labels (time)
-            ctx.fillStyle = textColor
-            ctx.font = '10px -apple-system, monospace'
-            ctx.textAlign = 'center'
-            const timeStr = formatTime(point.entry.timestamp).split('.')[0]
-            ctx.fillText(timeStr, x, height - padding.bottom + 15)
+            // Only draw if within data range
+            if (timestamp >= xMin && timestamp <= xMax) {
+                const x = xScale(timestamp)
+
+                ctx.strokeStyle = gridColor
+                ctx.beginPath()
+                ctx.moveTo(x, padding.top)
+                ctx.lineTo(x, height - padding.bottom)
+                ctx.stroke()
+
+                // X-axis labels (time ticks)
+                ctx.fillStyle = textColor
+                ctx.font = '10px -apple-system, monospace'
+                ctx.textAlign = 'center'
+                const label = secondsAgo > 0 ? `-${Math.round(secondsAgo)}s` : 'now'
+                ctx.fillText(label, x, height - padding.bottom + 15)
+            }
         }
 
         ctx.setLineDash([])
