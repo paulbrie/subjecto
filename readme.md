@@ -2,10 +2,13 @@
   <img src="./src/logo.svg" alt="Subjecto Logo" width="120" />
 </p>
 
-![npm](https://img.shields.io/npm/dm/subjecto)
-![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![Bundle Size](https://img.shields.io/bundlephobia/minzip/subjecto)
-![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue)
+<p align="center">
+  <a href="https://www.npmjs.com/package/subjecto"><img src="https://img.shields.io/npm/v/subjecto" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/subjecto"><img src="https://img.shields.io/npm/dm/subjecto" alt="npm downloads"></a>
+  <a href="#"><img src="https://img.shields.io/badge/coverage-100%25-brightgreen" alt="coverage"></a>
+  <a href="https://bundlephobia.com/package/subjecto"><img src="https://img.shields.io/bundlephobia/minzip/subjecto" alt="bundle size"></a>
+  <a href="#"><img src="https://img.shields.io/badge/TypeScript-100%25-blue" alt="typescript"></a>
+</p>
 
 # Subjecto
 
