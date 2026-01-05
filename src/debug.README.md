@@ -5,7 +5,9 @@ Visual debugging utility for Subject instances with real-time updates and an int
 ## Features
 
 - 📊 **Real-time Updates** - Watch your Subject's state change live
+- 📈 **Graph Visualization** - View history as an interactive timeline graph (numeric values)
 - 📜 **History Tracking** - Keep up to 50 entries of value changes with timestamps
+- 🔄 **Dual View Modes** - Toggle between list and graph views
 - 👥 **Subscriber List** - See all active subscriptions
 - ✏️ **Value Editor** - Manually update values via JSON input
 - ⏸ **Pause/Resume** - Freeze updates for inspection
@@ -206,8 +208,15 @@ interface DebugOptions {
 - **Editor**: Input field to manually update value (optional)
 
 ### History Section
-- **Timeline**: List of all value changes with timestamps
-- **Latest Indicator**: Highlights the most recent change
+- **View Toggle**: Switch between list and graph views
+- **List View**: Timeline of all value changes with timestamps
+- **Graph View**: Interactive line chart showing numeric values over time
+  - Automatically extracts numeric values (numbers, booleans, array lengths, object key counts)
+  - Displays time on X-axis and values on Y-axis
+  - Highlights latest value point in green
+  - Shows grid lines and axis labels
+  - Adapts to light/dark mode
+- **Latest Indicator**: Highlights the most recent change (list view)
 - **Count Badge**: Shows update number for each entry
 
 ### Subscribers Section
@@ -237,6 +246,20 @@ You can override styles by targeting these classes:
 
 ### Pause/Resume
 Click the pause button to freeze updates. Resume to continue tracking.
+
+### View Toggle (Graph/List)
+Switch between list and graph views in the History section. Graph view automatically extracts numeric values and displays them as an interactive timeline chart with:
+- Time-based X-axis
+- Value-based Y-axis with labels
+- Grid lines for easy reading
+- Color-coded points (blue for historical, green for latest)
+- Automatic scaling and padding
+
+The graph supports:
+- **Numbers**: Direct values
+- **Booleans**: 1 for true, 0 for false
+- **Arrays**: Length of array
+- **Objects**: Number of keys
 
 ### Clear History
 Removes all history entries while keeping the current state.

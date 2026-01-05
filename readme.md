@@ -75,7 +75,7 @@ Subjecto is extremely lightweight and tree-shakeable:
 | `subjecto/helpers` | 0.7KB | **0.3KB** | Tree-shakeable utilities |
 | `subjecto` (full) | 4.8KB | **1.8KB** | Subject + DeepSubject |
 | `subjecto/react` | 1.2KB | **0.5KB** | React hooks |
-| `subjecto/debug` | 15KB | **5KB** | Visual debugging UI |
+| `subjecto/debug` | 18KB | **6KB** | Visual debugging UI with graph |
 
 **Comparison with other libraries:**
 - Zustand: ~1.2KB gzipped
@@ -185,7 +185,9 @@ Subjecto includes a powerful visual debugging utility that provides real-time in
 ### Features
 
 - 📊 **Real-time Updates** - Watch your Subject's state change live
+- 📈 **Graph Visualization** - View history as an interactive timeline graph (numeric values)
 - 📜 **History Tracking** - Keep up to 50 entries of value changes with timestamps
+- 🔄 **Dual View Modes** - Toggle between list and graph views
 - 👥 **Subscriber List** - See all active subscriptions
 - ✏️ **Value Editor** - Manually update values via JSON input
 - ⏸ **Pause/Resume** - Freeze updates for inspection

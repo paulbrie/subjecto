@@ -73,6 +73,7 @@ export function debugSubject<T>(
 
     const history: HistoryEntry[] = []
     let isPaused = false
+    let viewMode: 'list' | 'graph' = 'list'
 
     // Create UI structure
     const wrapper = document.createElement('div')
@@ -125,9 +126,11 @@ export function debugSubject<T>(
             <div class="section-header ${collapsible ? 'collapsible' : ''}" data-section="history">
                 <span class="section-title">📜 History</span>
                 <span class="history-count badge">0</span>
+                <button class="btn btn-sm view-toggle" data-action="toggle-view">📊 Graph</button>
                 <span class="collapse-icon">▼</span>
             </div>
             <div class="section-content" data-section="history">
+                <canvas class="history-graph" width="600" height="200" style="display: none;"></canvas>
                 <div class="history-list"></div>
             </div>
         </div>
@@ -155,10 +158,12 @@ export function debugSubject<T>(
     const updateCountEl = wrapper.querySelector('.update-count') as HTMLElement
     const valueTypeEl = wrapper.querySelector('.value-type') as HTMLElement
     const historyListEl = wrapper.querySelector('.history-list') as HTMLElement
+    const historyGraphEl = wrapper.querySelector('.history-graph') as HTMLCanvasElement
     const historyCountEl = wrapper.querySelector('.history-count') as HTMLElement
     const subscribersListEl = wrapper.querySelector('.subscribers-list') as HTMLElement
     const valueEditor = wrapper.querySelector('.value-editor') as HTMLInputElement
     const pauseBtn = wrapper.querySelector('[data-action="pause"]') as HTMLButtonElement
+    const viewToggleBtn = wrapper.querySelector('[data-action="toggle-view"]') as HTMLButtonElement
 
     // Update UI function
     function updateUI() {
@@ -199,19 +204,201 @@ export function debugSubject<T>(
     // Update history UI
     function updateHistoryUI() {
         historyCountEl.textContent = history.length.toString()
-        historyListEl.innerHTML = history
-            .map(
-                (entry, index) => `
-            <div class="history-item ${index === 0 ? 'latest' : ''}">
-                <div class="history-header">
-                    <span class="history-time">${formatTime(entry.timestamp)}</span>
-                    <span class="history-count badge">#${entry.count}</span>
+
+        if (viewMode === 'graph') {
+            historyListEl.style.display = 'none'
+            historyGraphEl.style.display = 'block'
+            drawGraph()
+        } else {
+            historyListEl.style.display = 'block'
+            historyGraphEl.style.display = 'none'
+            historyListEl.innerHTML = history
+                .map(
+                    (entry, index) => `
+                <div class="history-item ${index === 0 ? 'latest' : ''}">
+                    <div class="history-header">
+                        <span class="history-time">${formatTime(entry.timestamp)}</span>
+                        <span class="history-count badge">#${entry.count}</span>
+                    </div>
+                    <code class="history-value">${formatValue(entry.value)}</code>
                 </div>
-                <code class="history-value">${formatValue(entry.value)}</code>
-            </div>
-        `
-            )
-            .join('')
+            `
+                )
+                .join('')
+        }
+    }
+
+    // Draw history graph
+    function drawGraph() {
+        if (!historyGraphEl || history.length === 0) return
+
+        const ctx = historyGraphEl.getContext('2d')
+        if (!ctx) return
+
+        // Get colors based on theme
+        const isDark = darkMode
+        const bgColor = isDark ? '#0d1117' : '#ffffff'
+        const gridColor = isDark ? '#30363d' : '#e1e4e8'
+        const textColor = isDark ? '#c9d1d9' : '#24292e'
+        const lineColor = isDark ? '#58a6ff' : '#0969da'
+        const pointColor = isDark ? '#1f6feb' : '#0969da'
+        const latestPointColor = isDark ? '#2ea043' : '#2ea44f'
+
+        // Set canvas size to match container
+        const canvas = historyGraphEl
+        const rect = canvas.getBoundingClientRect()
+        const dpr = window.devicePixelRatio || 1
+        canvas.width = rect.width * dpr
+        canvas.height = rect.height * dpr
+        ctx.scale(dpr, dpr)
+
+        const width = rect.width
+        const height = rect.height
+        const padding = { top: 20, right: 20, bottom: 30, left: 50 }
+        const graphWidth = width - padding.left - padding.right
+        const graphHeight = height - padding.top - padding.bottom
+
+        // Clear canvas
+        ctx.fillStyle = bgColor
+        ctx.fillRect(0, 0, width, height)
+
+        // Extract numeric values or count changes
+        const dataPoints: Array<{ x: number; y: number; entry: HistoryEntry }> = []
+
+        for (let i = history.length - 1; i >= 0; i--) {
+            const entry = history[i]
+            let numValue: number | null = null
+
+            if (typeof entry.value === 'number') {
+                numValue = entry.value
+            } else if (typeof entry.value === 'boolean') {
+                numValue = entry.value ? 1 : 0
+            } else if (Array.isArray(entry.value)) {
+                numValue = entry.value.length
+            } else if (typeof entry.value === 'object' && entry.value !== null) {
+                numValue = Object.keys(entry.value).length
+            }
+
+            if (numValue !== null) {
+                dataPoints.push({
+                    x: entry.timestamp.getTime(),
+                    y: numValue,
+                    entry
+                })
+            }
+        }
+
+        if (dataPoints.length === 0) {
+            ctx.fillStyle = textColor
+            ctx.font = '14px -apple-system, sans-serif'
+            ctx.textAlign = 'center'
+            ctx.fillText('No numeric data to display', width / 2, height / 2)
+            return
+        }
+
+        // Calculate scales
+        const xMin = Math.min(...dataPoints.map(p => p.x))
+        const xMax = Math.max(...dataPoints.map(p => p.x))
+        const yMin = Math.min(...dataPoints.map(p => p.y))
+        const yMax = Math.max(...dataPoints.map(p => p.y))
+        const yRange = yMax - yMin || 1
+        const yPadding = yRange * 0.1
+
+        const xScale = (x: number) => padding.left + ((x - xMin) / (xMax - xMin || 1)) * graphWidth
+        const yScale = (y: number) => padding.top + graphHeight - ((y - yMin + yPadding) / (yRange + 2 * yPadding)) * graphHeight
+
+        // Draw grid lines
+        ctx.strokeStyle = gridColor
+        ctx.lineWidth = 1
+        ctx.setLineDash([2, 2])
+
+        // Horizontal grid lines (5 lines)
+        for (let i = 0; i <= 4; i++) {
+            const y = padding.top + (graphHeight / 4) * i
+            ctx.beginPath()
+            ctx.moveTo(padding.left, y)
+            ctx.lineTo(width - padding.right, y)
+            ctx.stroke()
+
+            // Y-axis labels
+            const value = yMax - (yRange / 4) * i
+            ctx.fillStyle = textColor
+            ctx.font = '11px -apple-system, monospace'
+            ctx.textAlign = 'right'
+            ctx.fillText(value.toFixed(2), padding.left - 5, y + 4)
+        }
+
+        // Vertical grid lines (time markers)
+        const timePoints = Math.min(5, dataPoints.length)
+        for (let i = 0; i < timePoints; i++) {
+            const idx = Math.floor((dataPoints.length - 1) * i / (timePoints - 1))
+            const point = dataPoints[idx]
+            const x = xScale(point.x)
+
+            ctx.strokeStyle = gridColor
+            ctx.beginPath()
+            ctx.moveTo(x, padding.top)
+            ctx.lineTo(x, height - padding.bottom)
+            ctx.stroke()
+
+            // X-axis labels (time)
+            ctx.fillStyle = textColor
+            ctx.font = '10px -apple-system, monospace'
+            ctx.textAlign = 'center'
+            const timeStr = formatTime(point.entry.timestamp).split('.')[0]
+            ctx.fillText(timeStr, x, height - padding.bottom + 15)
+        }
+
+        ctx.setLineDash([])
+
+        // Draw line
+        ctx.strokeStyle = lineColor
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        dataPoints.forEach((point, i) => {
+            const x = xScale(point.x)
+            const y = yScale(point.y)
+            if (i === 0) {
+                ctx.moveTo(x, y)
+            } else {
+                ctx.lineTo(x, y)
+            }
+        })
+        ctx.stroke()
+
+        // Draw points
+        dataPoints.forEach((point, i) => {
+            const x = xScale(point.x)
+            const y = yScale(point.y)
+            const isLatest = i === dataPoints.length - 1
+
+            ctx.fillStyle = isLatest ? latestPointColor : pointColor
+            ctx.beginPath()
+            ctx.arc(x, y, isLatest ? 5 : 3, 0, Math.PI * 2)
+            ctx.fill()
+
+            // Draw value label for latest point
+            if (isLatest) {
+                ctx.fillStyle = textColor
+                ctx.font = 'bold 12px -apple-system, monospace'
+                ctx.textAlign = 'left'
+                ctx.fillText(point.y.toString(), x + 8, y + 4)
+            }
+        })
+
+        // Draw axes
+        ctx.strokeStyle = textColor
+        ctx.lineWidth = 1
+        // Y-axis
+        ctx.beginPath()
+        ctx.moveTo(padding.left, padding.top)
+        ctx.lineTo(padding.left, height - padding.bottom)
+        ctx.stroke()
+        // X-axis
+        ctx.beginPath()
+        ctx.moveTo(padding.left, height - padding.bottom)
+        ctx.lineTo(width - padding.right, height - padding.bottom)
+        ctx.stroke()
     }
 
     // Update subscribers list
@@ -244,6 +431,12 @@ export function debugSubject<T>(
 
     function handleClear() {
         history.length = 0
+        updateHistoryUI()
+    }
+
+    function handleToggleView() {
+        viewMode = viewMode === 'list' ? 'graph' : 'list'
+        viewToggleBtn.textContent = viewMode === 'list' ? '📊 Graph' : '📋 List'
         updateHistoryUI()
     }
 
@@ -304,11 +497,18 @@ export function debugSubject<T>(
     wrapper.querySelector('[data-action="clear"]')?.addEventListener('click', handleClear)
     wrapper.querySelector('[data-action="copy"]')?.addEventListener('click', handleCopy)
     wrapper.querySelector('[data-action="update"]')?.addEventListener('click', handleUpdate)
+    wrapper.querySelector('[data-action="toggle-view"]')?.addEventListener('click', (e) => {
+        e.stopPropagation()
+        handleToggleView()
+    })
 
     // Collapsible sections
     if (collapsible) {
         wrapper.querySelectorAll('.section-header.collapsible').forEach((header) => {
-            header.addEventListener('click', () => {
+            header.addEventListener('click', (e) => {
+                // Don't collapse if clicking on a button inside the header
+                if ((e.target as HTMLElement).closest('button')) return
+
                 const section = header.getAttribute('data-section')
                 if (section) handleCollapse(section)
             })
@@ -603,6 +803,22 @@ function injectStyles(darkMode: boolean) {
         .history-list {
             max-height: 300px;
             overflow-y: auto;
+        }
+
+        .history-graph {
+            width: 100%;
+            height: 200px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+        }
+
+        .dark .history-graph {
+            border-color: #30363d;
+        }
+
+        .view-toggle {
+            margin-left: auto;
+            margin-right: 8px;
         }
 
         .history-item {
