@@ -46,6 +46,16 @@
         "default": "./dist/helpers.cjs"
       }
     },
+    "./debug": {
+      "import": {
+        "types": "./dist/debug.d.ts",
+        "default": "./dist/debug.js"
+      },
+      "require": {
+        "types": "./dist/debug.d.cts",
+        "default": "./dist/debug.cjs"
+      }
+    },
     "./react": {
       "import": {
         "types": "./dist/react/index.d.ts",

@@ -1,0 +1,751 @@
+/**
+ * Visual debugging utility for Subject instances
+ * Provides a real-time UI for inspecting and interacting with Subjects
+ */
+
+import { Subject } from './subject'
+
+interface DebugOptions {
+    /**
+     * Maximum number of history entries to keep
+     * @default 50
+     */
+    maxHistory?: number
+    /**
+     * Enable dark mode
+     * @default false
+     */
+    darkMode?: boolean
+    /**
+     * Title for the debug panel
+     * @default Subject name or "Subject Debug"
+     */
+    title?: string
+    /**
+     * Enable value editor
+     * @default true
+     */
+    editable?: boolean
+    /**
+     * Enable collapsible sections
+     * @default true
+     */
+    collapsible?: boolean
+}
+
+interface HistoryEntry {
+    timestamp: Date
+    value: unknown
+    count: number
+}
+
+/**
+ * Creates a visual debugging UI for a Subject instance
+ *
+ * @param subject - The Subject instance to debug
+ * @param container - DOM element to render the debug UI into
+ * @param options - Configuration options
+ * @returns Cleanup function to remove the debug UI
+ *
+ * @example
+ * ```typescript
+ * import { Subject } from 'subjecto'
+ * import { debugSubject } from 'subjecto/debug'
+ *
+ * const counter = new Subject(0, { name: 'counter' })
+ * const cleanup = debugSubject(counter, document.getElementById('debug'))
+ *
+ * // Later: cleanup()
+ * ```
+ */
+export function debugSubject<T>(
+    subject: Subject<T>,
+    container: HTMLElement,
+    options: DebugOptions = {}
+): () => void {
+    const {
+        maxHistory = 50,
+        darkMode = false,
+        title = subject.options.name || 'Subject Debug',
+        editable = true,
+        collapsible = true,
+    } = options
+
+    const history: HistoryEntry[] = []
+    let isPaused = false
+
+    // Create UI structure
+    const wrapper = document.createElement('div')
+    wrapper.className = `subjecto-debug ${darkMode ? 'dark' : 'light'}`
+    wrapper.innerHTML = `
+        <div class="debug-header">
+            <h3 class="debug-title">${title}</h3>
+            <div class="debug-actions">
+                <button class="btn btn-sm" data-action="pause">⏸ Pause</button>
+                <button class="btn btn-sm" data-action="clear">🗑 Clear</button>
+                <button class="btn btn-sm" data-action="copy">📋 Copy</button>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <div class="section-header ${collapsible ? 'collapsible' : ''}" data-section="current">
+                <span class="section-title">📊 Current State</span>
+                <span class="collapse-icon">▼</span>
+            </div>
+            <div class="section-content" data-section="current">
+                <div class="stat-grid">
+                    <div class="stat">
+                        <span class="stat-label">Value:</span>
+                        <code class="stat-value current-value"></code>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Subscribers:</span>
+                        <span class="stat-value subscriber-count badge"></span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Updates:</span>
+                        <span class="stat-value update-count badge"></span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Type:</span>
+                        <span class="stat-value value-type badge"></span>
+                    </div>
+                </div>
+                ${editable ? `
+                <div class="editor-section">
+                    <label class="editor-label">Edit Value:</label>
+                    <input type="text" class="value-editor" placeholder="Enter new value (JSON)">
+                    <button class="btn btn-primary btn-sm" data-action="update">Update</button>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <div class="section-header ${collapsible ? 'collapsible' : ''}" data-section="history">
+                <span class="section-title">📜 History</span>
+                <span class="history-count badge">0</span>
+                <span class="collapse-icon">▼</span>
+            </div>
+            <div class="section-content" data-section="history">
+                <div class="history-list"></div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <div class="section-header ${collapsible ? 'collapsible' : ''}" data-section="subscribers">
+                <span class="section-title">👥 Subscribers</span>
+                <span class="collapse-icon">▼</span>
+            </div>
+            <div class="section-content" data-section="subscribers">
+                <div class="subscribers-list"></div>
+            </div>
+        </div>
+    `
+
+    // Inject styles
+    injectStyles(darkMode)
+
+    // Add to container
+    container.appendChild(wrapper)
+
+    // Get DOM references
+    const currentValueEl = wrapper.querySelector('.current-value') as HTMLElement
+    const subscriberCountEl = wrapper.querySelector('.subscriber-count') as HTMLElement
+    const updateCountEl = wrapper.querySelector('.update-count') as HTMLElement
+    const valueTypeEl = wrapper.querySelector('.value-type') as HTMLElement
+    const historyListEl = wrapper.querySelector('.history-list') as HTMLElement
+    const historyCountEl = wrapper.querySelector('.history-count') as HTMLElement
+    const subscribersListEl = wrapper.querySelector('.subscribers-list') as HTMLElement
+    const valueEditor = wrapper.querySelector('.value-editor') as HTMLInputElement
+    const pauseBtn = wrapper.querySelector('[data-action="pause"]') as HTMLButtonElement
+
+    // Update UI function
+    function updateUI() {
+        if (isPaused) return
+
+        const value = subject.getValue()
+        const count = subject.count
+        const subscriberCount = subject.subscribers.size
+
+        // Update current state
+        currentValueEl.textContent = formatValue(value)
+        subscriberCountEl.textContent = subscriberCount.toString()
+        updateCountEl.textContent = count.toString()
+        valueTypeEl.textContent = getValueType(value)
+
+        // Update subscribers list
+        updateSubscribersList()
+    }
+
+    // Add to history
+    function addToHistory() {
+        if (isPaused) return
+
+        const entry: HistoryEntry = {
+            timestamp: new Date(),
+            value: subject.getValue(),
+            count: subject.count,
+        }
+
+        history.unshift(entry)
+        if (history.length > maxHistory) {
+            history.pop()
+        }
+
+        updateHistoryUI()
+    }
+
+    // Update history UI
+    function updateHistoryUI() {
+        historyCountEl.textContent = history.length.toString()
+        historyListEl.innerHTML = history
+            .map(
+                (entry, index) => `
+            <div class="history-item ${index === 0 ? 'latest' : ''}">
+                <div class="history-header">
+                    <span class="history-time">${formatTime(entry.timestamp)}</span>
+                    <span class="history-count badge">#${entry.count}</span>
+                </div>
+                <code class="history-value">${formatValue(entry.value)}</code>
+            </div>
+        `
+            )
+            .join('')
+    }
+
+    // Update subscribers list
+    function updateSubscribersList() {
+        const subscribers = Array.from(subject.subscribers.entries())
+
+        if (subscribers.length === 0) {
+            subscribersListEl.innerHTML = '<div class="empty-state">No active subscribers</div>'
+            return
+        }
+
+        subscribersListEl.innerHTML = subscribers
+            .map(
+                ([id], index) => `
+            <div class="subscriber-item">
+                <span class="subscriber-id">Subscriber #${index + 1}</span>
+                <code class="subscriber-symbol">${id.toString()}</code>
+            </div>
+        `
+            )
+            .join('')
+    }
+
+    // Event handlers
+    function handlePause() {
+        isPaused = !isPaused
+        pauseBtn.textContent = isPaused ? '▶️ Resume' : '⏸ Pause'
+        pauseBtn.classList.toggle('active', isPaused)
+    }
+
+    function handleClear() {
+        history.length = 0
+        updateHistoryUI()
+    }
+
+    function handleCopy() {
+        const value = subject.getValue()
+        const text = JSON.stringify(value, null, 2)
+        navigator.clipboard.writeText(text).then(() => {
+            showNotification('Copied to clipboard!')
+        })
+    }
+
+    function handleUpdate() {
+        if (!valueEditor || !editable) return
+
+        try {
+            const newValue = JSON.parse(valueEditor.value)
+            subject.next(newValue as T)
+            valueEditor.value = ''
+            showNotification('Value updated!')
+        } catch (error) {
+            showNotification('Invalid JSON', 'error')
+        }
+    }
+
+    function handleCollapse(sectionName: string) {
+        const content = wrapper.querySelector(
+            `.section-content[data-section="${sectionName}"]`
+        ) as HTMLElement
+        const header = wrapper.querySelector(
+            `.section-header[data-section="${sectionName}"]`
+        ) as HTMLElement
+        const icon = header.querySelector('.collapse-icon') as HTMLElement
+
+        if (content.style.display === 'none') {
+            content.style.display = 'block'
+            icon.textContent = '▼'
+        } else {
+            content.style.display = 'none'
+            icon.textContent = '▶'
+        }
+    }
+
+    // Show notification
+    function showNotification(message: string, type: 'success' | 'error' = 'success') {
+        const notification = document.createElement('div')
+        notification.className = `debug-notification ${type}`
+        notification.textContent = message
+        wrapper.appendChild(notification)
+
+        setTimeout(() => {
+            notification.classList.add('fade-out')
+            setTimeout(() => notification.remove(), 300)
+        }, 2000)
+    }
+
+    // Attach event listeners
+    wrapper.querySelector('[data-action="pause"]')?.addEventListener('click', handlePause)
+    wrapper.querySelector('[data-action="clear"]')?.addEventListener('click', handleClear)
+    wrapper.querySelector('[data-action="copy"]')?.addEventListener('click', handleCopy)
+    wrapper.querySelector('[data-action="update"]')?.addEventListener('click', handleUpdate)
+
+    // Collapsible sections
+    if (collapsible) {
+        wrapper.querySelectorAll('.section-header.collapsible').forEach((header) => {
+            header.addEventListener('click', () => {
+                const section = header.getAttribute('data-section')
+                if (section) handleCollapse(section)
+            })
+        })
+    }
+
+    // Editor enter key
+    valueEditor?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleUpdate()
+    })
+
+    // Subscribe to subject changes
+    const subscription = subject.subscribe(() => {
+        updateUI()
+        addToHistory()
+    })
+
+    // Initial render
+    updateUI()
+    addToHistory()
+
+    // Cleanup function
+    return () => {
+        subscription.unsubscribe()
+        wrapper.remove()
+    }
+}
+
+// Helper functions
+function formatValue(value: unknown): string {
+    if (value === null) return 'null'
+    if (value === undefined) return 'undefined'
+    if (typeof value === 'string') return `"${value}"`
+    if (typeof value === 'object') {
+        try {
+            return JSON.stringify(value, null, 2)
+        } catch {
+            return '[Circular]'
+        }
+    }
+    return String(value)
+}
+
+function getValueType(value: unknown): string {
+    if (value === null) return 'null'
+    if (Array.isArray(value)) return 'array'
+    return typeof value
+}
+
+function formatTime(date: Date): string {
+    const time = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+    })
+    const ms = date.getMilliseconds().toString().padStart(3, '0')
+    return `${time}.${ms}`
+}
+
+function injectStyles(darkMode: boolean) {
+    const styleId = 'subjecto-debug-styles'
+    if (document.getElementById(styleId)) return
+
+    const style = document.createElement('style')
+    style.id = styleId
+    style.textContent = `
+        .subjecto-debug {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            padding: 16px;
+            max-width: 100%;
+            font-size: 14px;
+            position: relative;
+        }
+
+        .subjecto-debug.light {
+            background: #ffffff;
+            color: #24292e;
+        }
+
+        .subjecto-debug.dark {
+            background: #0d1117;
+            color: #c9d1d9;
+            border-color: #30363d;
+        }
+
+        .debug-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e1e4e8;
+        }
+
+        .dark .debug-header {
+            border-bottom-color: #30363d;
+        }
+
+        .debug-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .debug-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: 1px solid #d1d5da;
+            border-radius: 6px;
+            background: #f6f8fa;
+            color: #24292e;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .dark .btn {
+            background: #21262d;
+            color: #c9d1d9;
+            border-color: #30363d;
+        }
+
+        .btn:hover {
+            background: #e1e4e8;
+        }
+
+        .dark .btn:hover {
+            background: #30363d;
+        }
+
+        .btn.active {
+            background: #0969da;
+            color: white;
+            border-color: #0969da;
+        }
+
+        .btn-primary {
+            background: #2ea44f;
+            color: white;
+            border-color: #2ea44f;
+        }
+
+        .btn-primary:hover {
+            background: #2c974b;
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+
+        .debug-section {
+            margin-bottom: 16px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #f6f8fa;
+            border-radius: 6px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .dark .section-header {
+            background: #161b22;
+        }
+
+        .section-header.collapsible {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .section-header.collapsible:hover {
+            background: #e1e4e8;
+        }
+
+        .dark .section-header.collapsible:hover {
+            background: #21262d;
+        }
+
+        .section-title {
+            flex: 1;
+        }
+
+        .collapse-icon {
+            font-size: 10px;
+            opacity: 0.6;
+        }
+
+        .section-content {
+            padding: 8px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            opacity: 0.7;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 13px;
+        }
+
+        code {
+            background: #f6f8fa;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 12px;
+        }
+
+        .dark code {
+            background: #161b22;
+        }
+
+        .current-value {
+            display: block;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #0969da;
+            color: white;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .editor-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e1e4e8;
+        }
+
+        .dark .editor-section {
+            border-top-color: #30363d;
+        }
+
+        .editor-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .value-editor {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d1d5da;
+            border-radius: 6px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .dark .value-editor {
+            background: #0d1117;
+            color: #c9d1d9;
+            border-color: #30363d;
+        }
+
+        .history-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .dark .history-item {
+            border-color: #30363d;
+        }
+
+        .history-item.latest {
+            border-color: #2ea44f;
+            border-width: 2px;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+            font-size: 11px;
+        }
+
+        .history-time {
+            opacity: 0.7;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        .history-value {
+            display: block;
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .history-count {
+            background: #6e7781;
+        }
+
+        .subscriber-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin-bottom: 4px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        .dark .subscriber-item {
+            border-color: #30363d;
+        }
+
+        .subscriber-id {
+            font-weight: 600;
+        }
+
+        .subscriber-symbol {
+            opacity: 0.6;
+            font-size: 10px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 24px;
+            opacity: 0.5;
+            font-style: italic;
+        }
+
+        .debug-notification {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .debug-notification.success {
+            background: #2ea44f;
+            color: white;
+        }
+
+        .debug-notification.error {
+            background: #cf222e;
+            color: white;
+        }
+
+        .debug-notification.fade-out {
+            animation: fadeOut 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+            }
+        }
+
+        /* Scrollbar styles */
+        .subjecto-debug ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .subjecto-debug ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .subjecto-debug ::-webkit-scrollbar-thumb {
+            background: #d1d5da;
+            border-radius: 4px;
+        }
+
+        .dark .subjecto-debug ::-webkit-scrollbar-thumb {
+            background: #30363d;
+        }
+
+        .subjecto-debug ::-webkit-scrollbar-thumb:hover {
+            background: #959da5;
+        }
+    `
+
+    document.head.appendChild(style)
+}

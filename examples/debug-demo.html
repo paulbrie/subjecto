@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subjecto Debug UI Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f6f8fa;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #6e7781;
+            margin-bottom: 32px;
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 768px) {
+            .demo-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .demo-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .demo-controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: 1px solid #d1d5da;
+            border-radius: 6px;
+            background: #f6f8fa;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #e1e4e8;
+        }
+
+        button.primary {
+            background: #2ea44f;
+            color: white;
+            border-color: #2ea44f;
+        }
+
+        button.primary:hover {
+            background: #2c974b;
+        }
+
+        .code-example {
+            background: #f6f8fa;
+            border: 1px solid #d1d5da;
+            border-radius: 6px;
+            padding: 16px;
+            margin-top: 16px;
+            overflow-x: auto;
+        }
+
+        pre {
+            margin: 0;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 13px;
+        }
+
+        .feature-list {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #d1d5da;
+        }
+
+        .feature-list h3 {
+            margin-top: 0;
+        }
+
+        .feature-list ul {
+            padding-left: 20px;
+        }
+
+        .feature-list li {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Subjecto Debug UI Demo</h1>
+        <p class="subtitle">Visual debugging utility for Subject instances with real-time updates</p>
+
+        <div class="demo-grid">
+            <!-- Counter Demo -->
+            <div class="demo-section">
+                <h2>Counter Example</h2>
+                <div class="demo-controls">
+                    <button onclick="incrementCounter()">➕ Increment</button>
+                    <button onclick="decrementCounter()">➖ Decrement</button>
+                    <button onclick="resetCounter()">🔄 Reset</button>
+                    <button onclick="randomCounter()">🎲 Random</button>
+                </div>
+                <div id="counter-debug"></div>
+
+                <div class="code-example">
+                    <pre>import { Subject } from 'subjecto'
+import { debugSubject } from 'subjecto/debug'
+
+const counter = new Subject(0, { name: 'counter' })
+debugSubject(counter, document.getElementById('debug'))</pre>
+                </div>
+            </div>
+
+            <!-- Todo List Demo -->
+            <div class="demo-section">
+                <h2>Todo List Example</h2>
+                <div class="demo-controls">
+                    <button onclick="addTodo()">➕ Add Todo</button>
+                    <button onclick="completeTodo()">✅ Complete First</button>
+                    <button onclick="removeTodo()">❌ Remove First</button>
+                    <button onclick="clearTodos()">🗑 Clear All</button>
+                </div>
+                <div id="todos-debug"></div>
+            </div>
+        </div>
+
+        <div class="demo-grid">
+            <!-- User Object Demo -->
+            <div class="demo-section">
+                <h2>User Object Example</h2>
+                <div class="demo-controls">
+                    <button onclick="updateName()">👤 Change Name</button>
+                    <button onclick="incrementAge()">🎂 +1 Age</button>
+                    <button onclick="toggleActive()">🔄 Toggle Active</button>
+                    <button onclick="addSkill()">⭐ Add Skill</button>
+                </div>
+                <div id="user-debug"></div>
+            </div>
+
+            <!-- Dark Mode Demo -->
+            <div class="demo-section" style="background: #0d1117;">
+                <h2 style="color: #c9d1d9;">Dark Mode Example</h2>
+                <div class="demo-controls">
+                    <button onclick="darkModeIncrement()">➕ Increment</button>
+                    <button onclick="darkModeMultiply()">✖️ ×2</button>
+                    <button onclick="darkModeReset()">🔄 Reset</button>
+                </div>
+                <div id="dark-debug"></div>
+            </div>
+        </div>
+
+        <div class="feature-list">
+            <h3>✨ Features</h3>
+            <ul>
+                <li>📊 <strong>Real-time Updates</strong> - Watch your Subject's state change live</li>
+                <li>📜 <strong>History Tracking</strong> - Keep up to 50 entries of value changes</li>
+                <li>👥 <strong>Subscriber List</strong> - See all active subscriptions</li>
+                <li>✏️ <strong>Value Editor</strong> - Manually update values via JSON input</li>
+                <li>⏸ <strong>Pause/Resume</strong> - Freeze updates for inspection</li>
+                <li>📋 <strong>Copy to Clipboard</strong> - Export current value as JSON</li>
+                <li>🎨 <strong>Dark Mode Support</strong> - Matches your theme preference</li>
+                <li>🗂 <strong>Collapsible Sections</strong> - Organize your debug view</li>
+                <li>🔔 <strong>Notifications</strong> - Visual feedback for actions</li>
+                <li>📱 <strong>Responsive Design</strong> - Works on all screen sizes</li>
+            </ul>
+        </div>
+    </div>
+
+    <script type="module">
+        // Note: In production, import from 'subjecto' and 'subjecto/debug'
+        // For this demo, we'll create inline versions
+
+        class Subject {
+            constructor(initialValue, options = {}) {
+                this.value = initialValue
+                this.subscribers = new Map()
+                this.count = 1
+                this.options = {
+                    name: options.name || 'noName',
+                    updateIfStrictlyEqual: options.updateIfStrictlyEqual ?? true
+                }
+            }
+
+            next(nextValue) {
+                this.value = nextValue
+                this.count++
+                this.subscribers.forEach(sub => sub(this.value))
+            }
+
+            subscribe(callback) {
+                const id = Symbol('subscriber')
+                this.subscribers.set(id, callback)
+                callback(this.value)
+                return {
+                    unsubscribe: () => this.subscribers.delete(id),
+                    id
+                }
+            }
+
+            getValue() {
+                return this.value
+            }
+        }
+
+        // debugSubject implementation (inline for demo)
+        // In production: import { debugSubject } from 'subjecto/debug'
+
+        function debugSubject(subject, container, options = {}) {
+            const {
+                maxHistory = 50,
+                darkMode = false,
+                title = subject.options.name || 'Subject Debug',
+                editable = true,
+                collapsible = true,
+            } = options
+
+            const history = []
+            let isPaused = false
+
+            // Helper functions
+            function formatValue(value) {
+                if (value === null) return 'null'
+                if (value === undefined) return 'undefined'
+                if (typeof value === 'string') return `"${value}"`
+                if (typeof value === 'object') {
+                    try {
+                        return JSON.stringify(value, null, 2)
+                    } catch {
+                        return '[Circular]'
+                    }
+                }
+                return String(value)
+            }
+
+            function getValueType(value) {
+                if (value === null) return 'null'
+                if (Array.isArray(value)) return 'array'
+                return typeof value
+            }
+
+            function formatTime(date) {
+                const time = date.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                })
+                const ms = date.getMilliseconds().toString().padStart(3, '0')
+                return `${time}.${ms}`
+            }
+
+            function injectStyles(darkMode) {
+                const styleId = 'subjecto-debug-styles'
+                if (document.getElementById(styleId)) return
+
+                const style = document.createElement('style')
+                style.id = styleId
+                style.textContent = `
+                    .subjecto-debug {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                        border: 1px solid #e1e4e8;
+                        border-radius: 8px;
+                        padding: 16px;
+                        max-width: 100%;
+                        font-size: 14px;
+                        position: relative;
+                    }
+                    .subjecto-debug.light {
+                        background: #ffffff;
+                        color: #24292e;
+                    }
+                    .subjecto-debug.dark {
+                        background: #0d1117;
+                        color: #c9d1d9;
+                        border-color: #30363d;
+                    }
+                    .debug-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 16px;
+                        padding-bottom: 12px;
+                        border-bottom: 2px solid #e1e4e8;
+                    }
+                    .dark .debug-header {
+                        border-bottom-color: #30363d;
+                    }
+                    .debug-title {
+                        margin: 0;
+                        font-size: 18px;
+                        font-weight: 600;
+                    }
+                    .debug-actions {
+                        display: flex;
+                        gap: 8px;
+                    }
+                    .btn {
+                        padding: 6px 12px;
+                        border: 1px solid #d1d5da;
+                        border-radius: 6px;
+                        background: #f6f8fa;
+                        color: #24292e;
+                        cursor: pointer;
+                        font-size: 12px;
+                        font-weight: 500;
+                        transition: all 0.2s;
+                    }
+                    .dark .btn {
+                        background: #21262d;
+                        color: #c9d1d9;
+                        border-color: #30363d;
+                    }
+                    .btn:hover {
+                        background: #e1e4e8;
+                    }
+                    .dark .btn:hover {
+                        background: #30363d;
+                    }
+                    .btn.active {
+                        background: #0969da;
+                        color: white;
+                        border-color: #0969da;
+                    }
+                    .btn-primary {
+                        background: #2ea44f;
+                        color: white;
+                        border-color: #2ea44f;
+                    }
+                    .btn-primary:hover {
+                        background: #2c974b;
+                    }
+                    .btn-sm {
+                        padding: 4px 8px;
+                        font-size: 11px;
+                    }
+                    .debug-section {
+                        margin-bottom: 16px;
+                    }
+                    .section-header {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        padding: 8px 12px;
+                        background: #f6f8fa;
+                        border-radius: 6px;
+                        font-weight: 600;
+                        margin-bottom: 8px;
+                    }
+                    .dark .section-header {
+                        background: #161b22;
+                    }
+                    .section-header.collapsible {
+                        cursor: pointer;
+                        user-select: none;
+                    }
+                    .section-header.collapsible:hover {
+                        background: #e1e4e8;
+                    }
+                    .dark .section-header.collapsible:hover {
+                        background: #21262d;
+                    }
+                    .section-title {
+                        flex: 1;
+                    }
+                    .collapse-icon {
+                        font-size: 10px;
+                        opacity: 0.6;
+                    }
+                    .section-content {
+                        padding: 8px;
+                    }
+                    .stat-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                        gap: 12px;
+                        margin-bottom: 12px;
+                    }
+                    .stat {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 4px;
+                    }
+                    .stat-label {
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        opacity: 0.7;
+                        font-weight: 600;
+                    }
+                    .stat-value {
+                        font-size: 13px;
+                    }
+                    code {
+                        background: #f6f8fa;
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+                        font-size: 12px;
+                    }
+                    .dark code {
+                        background: #161b22;
+                    }
+                    .current-value {
+                        display: block;
+                        white-space: pre-wrap;
+                        word-break: break-all;
+                        max-height: 200px;
+                        overflow-y: auto;
+                        padding: 8px;
+                    }
+                    .badge {
+                        display: inline-block;
+                        padding: 2px 8px;
+                        background: #0969da;
+                        color: white;
+                        border-radius: 12px;
+                        font-size: 11px;
+                        font-weight: 600;
+                    }
+                    .editor-section {
+                        margin-top: 12px;
+                        padding-top: 12px;
+                        border-top: 1px solid #e1e4e8;
+                    }
+                    .dark .editor-section {
+                        border-top-color: #30363d;
+                    }
+                    .editor-label {
+                        display: block;
+                        font-size: 12px;
+                        font-weight: 600;
+                        margin-bottom: 6px;
+                    }
+                    .value-editor {
+                        width: 100%;
+                        padding: 8px;
+                        border: 1px solid #d1d5da;
+                        border-radius: 6px;
+                        font-family: 'SF Mono', Monaco, monospace;
+                        font-size: 12px;
+                        margin-bottom: 8px;
+                    }
+                    .dark .value-editor {
+                        background: #0d1117;
+                        color: #c9d1d9;
+                        border-color: #30363d;
+                    }
+                    .history-list {
+                        max-height: 300px;
+                        overflow-y: auto;
+                    }
+                    .history-item {
+                        padding: 8px;
+                        margin-bottom: 8px;
+                        border: 1px solid #e1e4e8;
+                        border-radius: 6px;
+                        transition: all 0.2s;
+                    }
+                    .dark .history-item {
+                        border-color: #30363d;
+                    }
+                    .history-item.latest {
+                        border-color: #2ea44f;
+                        border-width: 2px;
+                    }
+                    .history-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 4px;
+                        font-size: 11px;
+                    }
+                    .history-time {
+                        opacity: 0.7;
+                        font-family: 'SF Mono', Monaco, monospace;
+                    }
+                    .history-value {
+                        display: block;
+                        font-size: 11px;
+                        white-space: pre-wrap;
+                        word-break: break-all;
+                    }
+                    .history-count {
+                        background: #6e7781;
+                    }
+                    .subscriber-item {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 8px;
+                        margin-bottom: 4px;
+                        border: 1px solid #e1e4e8;
+                        border-radius: 6px;
+                        font-size: 12px;
+                    }
+                    .dark .subscriber-item {
+                        border-color: #30363d;
+                    }
+                    .subscriber-id {
+                        font-weight: 600;
+                    }
+                    .subscriber-symbol {
+                        opacity: 0.6;
+                        font-size: 10px;
+                    }
+                    .empty-state {
+                        text-align: center;
+                        padding: 24px;
+                        opacity: 0.5;
+                        font-style: italic;
+                    }
+                    .debug-notification {
+                        position: absolute;
+                        top: 16px;
+                        right: 16px;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        font-size: 12px;
+                        font-weight: 600;
+                        z-index: 1000;
+                        animation: slideIn 0.3s ease;
+                    }
+                    .debug-notification.success {
+                        background: #2ea44f;
+                        color: white;
+                    }
+                    .debug-notification.error {
+                        background: #cf222e;
+                        color: white;
+                    }
+                    .debug-notification.fade-out {
+                        animation: fadeOut 0.3s ease;
+                    }
+                    @keyframes slideIn {
+                        from {
+                            transform: translateX(100%);
+                            opacity: 0;
+                        }
+                        to {
+                            transform: translateX(0);
+                            opacity: 1;
+                        }
+                    }
+                    @keyframes fadeOut {
+                        from {
+                            opacity: 1;
+                        }
+                        to {
+                            opacity: 0;
+                        }
+                    }
+                    .subjecto-debug ::-webkit-scrollbar {
+                        width: 8px;
+                        height: 8px;
+                    }
+                    .subjecto-debug ::-webkit-scrollbar-track {
+                        background: transparent;
+                    }
+                    .subjecto-debug ::-webkit-scrollbar-thumb {
+                        background: #d1d5da;
+                        border-radius: 4px;
+                    }
+                    .dark .subjecto-debug ::-webkit-scrollbar-thumb {
+                        background: #30363d;
+                    }
+                    .subjecto-debug ::-webkit-scrollbar-thumb:hover {
+                        background: #959da5;
+                    }
+                `
+                document.head.appendChild(style)
+            }
+
+            // Create UI structure
+            const wrapper = document.createElement('div')
+            wrapper.className = `subjecto-debug ${darkMode ? 'dark' : 'light'}`
+            wrapper.innerHTML = `
+                <div class="debug-header">
+                    <h3 class="debug-title">${title}</h3>
+                    <div class="debug-actions">
+                        <button class="btn btn-sm" data-action="pause">⏸ Pause</button>
+                        <button class="btn btn-sm" data-action="clear">🗑 Clear</button>
+                        <button class="btn btn-sm" data-action="copy">📋 Copy</button>
+                    </div>
+                </div>
+
+                <div class="debug-section">
+                    <div class="section-header ${collapsible ? 'collapsible' : ''}" data-section="current">
+                        <span class="section-title">📊 Current State</span>
+                        <span class="collapse-icon">▼</span>
+                    </div>
+                    <div class="section-content" data-section="current">
+                        <div class="stat-grid">
+                            <div class="stat">
+                                <span class="stat-label">Value:</span>
+                                <code class="stat-value current-value"></code>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">Subscribers:</span>
+                                <span class="stat-value subscriber-count badge"></span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">Updates:</span>
+                                <span class="stat-value update-count badge"></span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">Type:</span>
+                                <span class="stat-value value-type badge"></span>
+                            </div>
+                        </div>
+                        ${editable ? `
+                        <div class="editor-section">
+                            <label class="editor-label">Edit Value:</label>
+                            <input type="text" class="value-editor" placeholder="Enter new value (JSON)">
+                            <button class="btn btn-primary btn-sm" data-action="update">Update</button>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <div class="debug-section">
+                    <div class="section-header ${collapsible ? 'collapsible' : ''}" data-section="history">
+                        <span class="section-title">📜 History</span>
+                        <span class="history-count badge">0</span>
+                        <span class="collapse-icon">▼</span>
+                    </div>
+                    <div class="section-content" data-section="history">
+                        <div class="history-list"></div>
+                    </div>
+                </div>
+
+                <div class="debug-section">
+                    <div class="section-header ${collapsible ? 'collapsible' : ''}" data-section="subscribers">
+                        <span class="section-title">👥 Subscribers</span>
+                        <span class="collapse-icon">▼</span>
+                    </div>
+                    <div class="section-content" data-section="subscribers">
+                        <div class="subscribers-list"></div>
+                    </div>
+                </div>
+            `
+
+            // Inject styles
+            injectStyles(darkMode)
+
+            // Add to container
+            container.appendChild(wrapper)
+
+            // Get DOM references
+            const currentValueEl = wrapper.querySelector('.current-value')
+            const subscriberCountEl = wrapper.querySelector('.subscriber-count')
+            const updateCountEl = wrapper.querySelector('.update-count')
+            const valueTypeEl = wrapper.querySelector('.value-type')
+            const historyListEl = wrapper.querySelector('.history-list')
+            const historyCountEl = wrapper.querySelector('.history-count')
+            const subscribersListEl = wrapper.querySelector('.subscribers-list')
+            const valueEditor = wrapper.querySelector('.value-editor')
+            const pauseBtn = wrapper.querySelector('[data-action="pause"]')
+
+            // Update UI function
+            function updateUI() {
+                if (isPaused) return
+
+                const value = subject.getValue()
+                const count = subject.count
+                const subscriberCount = subject.subscribers.size
+
+                // Update current state
+                currentValueEl.textContent = formatValue(value)
+                subscriberCountEl.textContent = subscriberCount.toString()
+                updateCountEl.textContent = count.toString()
+                valueTypeEl.textContent = getValueType(value)
+
+                // Update subscribers list
+                updateSubscribersList()
+            }
+
+            // Add to history
+            function addToHistory() {
+                if (isPaused) return
+
+                const entry = {
+                    timestamp: new Date(),
+                    value: subject.getValue(),
+                    count: subject.count,
+                }
+
+                history.unshift(entry)
+                if (history.length > maxHistory) {
+                    history.pop()
+                }
+
+                updateHistoryUI()
+            }
+
+            // Update history UI
+            function updateHistoryUI() {
+                historyCountEl.textContent = history.length.toString()
+                historyListEl.innerHTML = history
+                    .map(
+                        (entry, index) => `
+                    <div class="history-item ${index === 0 ? 'latest' : ''}">
+                        <div class="history-header">
+                            <span class="history-time">${formatTime(entry.timestamp)}</span>
+                            <span class="history-count badge">#${entry.count}</span>
+                        </div>
+                        <code class="history-value">${formatValue(entry.value)}</code>
+                    </div>
+                `
+                    )
+                    .join('')
+            }
+
+            // Update subscribers list
+            function updateSubscribersList() {
+                const subscribers = Array.from(subject.subscribers.entries())
+
+                if (subscribers.length === 0) {
+                    subscribersListEl.innerHTML = '<div class="empty-state">No active subscribers</div>'
+                    return
+                }
+
+                subscribersListEl.innerHTML = subscribers
+                    .map(
+                        ([id], index) => `
+                    <div class="subscriber-item">
+                        <span class="subscriber-id">Subscriber #${index + 1}</span>
+                        <code class="subscriber-symbol">${id.toString()}</code>
+                    </div>
+                `
+                    )
+                    .join('')
+            }
+
+            // Event handlers
+            function handlePause() {
+                isPaused = !isPaused
+                pauseBtn.textContent = isPaused ? '▶️ Resume' : '⏸ Pause'
+                pauseBtn.classList.toggle('active', isPaused)
+            }
+
+            function handleClear() {
+                history.length = 0
+                updateHistoryUI()
+            }
+
+            function handleCopy() {
+                const value = subject.getValue()
+                const text = JSON.stringify(value, null, 2)
+                navigator.clipboard.writeText(text).then(() => {
+                    showNotification('Copied to clipboard!')
+                })
+            }
+
+            function handleUpdate() {
+                if (!valueEditor || !editable) return
+
+                try {
+                    const newValue = JSON.parse(valueEditor.value)
+                    subject.next(newValue)
+                    valueEditor.value = ''
+                    showNotification('Value updated!')
+                } catch (error) {
+                    showNotification('Invalid JSON', 'error')
+                }
+            }
+
+            function handleCollapse(sectionName) {
+                const content = wrapper.querySelector(
+                    `.section-content[data-section="${sectionName}"]`
+                )
+                const header = wrapper.querySelector(
+                    `.section-header[data-section="${sectionName}"]`
+                )
+                const icon = header.querySelector('.collapse-icon')
+
+                if (content.style.display === 'none') {
+                    content.style.display = 'block'
+                    icon.textContent = '▼'
+                } else {
+                    content.style.display = 'none'
+                    icon.textContent = '▶'
+                }
+            }
+
+            // Show notification
+            function showNotification(message, type = 'success') {
+                const notification = document.createElement('div')
+                notification.className = `debug-notification ${type}`
+                notification.textContent = message
+                wrapper.appendChild(notification)
+
+                setTimeout(() => {
+                    notification.classList.add('fade-out')
+                    setTimeout(() => notification.remove(), 300)
+                }, 2000)
+            }
+
+            // Attach event listeners
+            wrapper.querySelector('[data-action="pause"]')?.addEventListener('click', handlePause)
+            wrapper.querySelector('[data-action="clear"]')?.addEventListener('click', handleClear)
+            wrapper.querySelector('[data-action="copy"]')?.addEventListener('click', handleCopy)
+            wrapper.querySelector('[data-action="update"]')?.addEventListener('click', handleUpdate)
+
+            // Collapsible sections
+            if (collapsible) {
+                wrapper.querySelectorAll('.section-header.collapsible').forEach((header) => {
+                    header.addEventListener('click', () => {
+                        const section = header.getAttribute('data-section')
+                        if (section) handleCollapse(section)
+                    })
+                })
+            }
+
+            // Editor enter key
+            valueEditor?.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleUpdate()
+            })
+
+            // Subscribe to subject changes
+            const subscription = subject.subscribe(() => {
+                updateUI()
+                addToHistory()
+            })
+
+            // Initial render
+            updateUI()
+            addToHistory()
+
+            // Cleanup function
+            return () => {
+                subscription.unsubscribe()
+                wrapper.remove()
+            }
+        }
+
+        // Demo 1: Counter
+        window.counter = new Subject(0, { name: 'counter' })
+
+        window.incrementCounter = () => counter.next(counter.getValue() + 1)
+        window.decrementCounter = () => counter.next(counter.getValue() - 1)
+        window.resetCounter = () => counter.next(0)
+        window.randomCounter = () => counter.next(Math.floor(Math.random() * 100))
+
+        // Demo 2: Todos
+        window.todos = new Subject([], { name: 'todos' })
+        let todoId = 1
+
+        window.addTodo = () => {
+            const current = todos.getValue()
+            todos.next([...current, {
+                id: todoId++,
+                text: `Todo ${todoId}`,
+                completed: false
+            }])
+        }
+
+        window.completeTodo = () => {
+            const current = todos.getValue()
+            if (current.length > 0) {
+                todos.next([
+                    { ...current[0], completed: true },
+                    ...current.slice(1)
+                ])
+            }
+        }
+
+        window.removeTodo = () => {
+            const current = todos.getValue()
+            if (current.length > 0) {
+                todos.next(current.slice(1))
+            }
+        }
+
+        window.clearTodos = () => todos.next([])
+
+        // Demo 3: User Object
+        window.user = new Subject({
+            name: 'Alice',
+            age: 28,
+            active: true,
+            skills: ['JavaScript', 'TypeScript']
+        }, { name: 'user' })
+
+        const names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve']
+        window.updateName = () => {
+            const current = user.getValue()
+            const newName = names[Math.floor(Math.random() * names.length)]
+            user.next({ ...current, name: newName })
+        }
+
+        window.incrementAge = () => {
+            const current = user.getValue()
+            user.next({ ...current, age: current.age + 1 })
+        }
+
+        window.toggleActive = () => {
+            const current = user.getValue()
+            user.next({ ...current, active: !current.active })
+        }
+
+        const skills = ['React', 'Vue', 'Angular', 'Node.js', 'Python', 'Go']
+        window.addSkill = () => {
+            const current = user.getValue()
+            const newSkill = skills.find(s => !current.skills.includes(s))
+            if (newSkill) {
+                user.next({ ...current, skills: [...current.skills, newSkill] })
+            }
+        }
+
+        // Demo 4: Dark Mode
+        window.darkCounter = new Subject(1, { name: 'darkCounter' })
+
+        window.darkModeIncrement = () => darkCounter.next(darkCounter.getValue() + 1)
+        window.darkModeMultiply = () => darkCounter.next(darkCounter.getValue() * 2)
+        window.darkModeReset = () => darkCounter.next(1)
+
+        // Initialize debug UIs
+        debugSubject(counter, document.getElementById('counter-debug'))
+        debugSubject(todos, document.getElementById('todos-debug'))
+        debugSubject(user, document.getElementById('user-debug'))
+        debugSubject(darkCounter, document.getElementById('dark-debug'), { darkMode: true })
+
+        console.log('Demo initialized! Check the console for Subject instances.')
+        console.log('Subjects:', { counter, todos, user, darkCounter })
+    </script>
+</body>
+</html>

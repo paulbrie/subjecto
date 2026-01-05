@@ -19,6 +19,7 @@ A minimalistic, zero-dependency JavaScript state management library built with T
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Features](#features)
+- [Debug UI](#debug-ui)
 - [API Reference](#api-reference)
   - [Subject](#subject)
   - [DeepSubject](#deepsubject)
@@ -74,6 +75,7 @@ Subjecto is extremely lightweight and tree-shakeable:
 | `subjecto/helpers` | 0.7KB | **0.3KB** | Tree-shakeable utilities |
 | `subjecto` (full) | 4.8KB | **1.8KB** | Subject + DeepSubject |
 | `subjecto/react` | 1.2KB | **0.5KB** | React hooks |
+| `subjecto/debug` | 15KB | **5KB** | Visual debugging UI |
 
 **Comparison with other libraries:**
 - Zustand: ~1.2KB gzipped
@@ -96,6 +98,9 @@ import { nextPush, toggle, once } from 'subjecto/helpers'
 
 // React hooks (~0.5KB gzipped)
 import { useSubject, useDeepSubject } from 'subjecto/react'
+
+// Debug UI (~5KB gzipped, dev-only)
+import { debugSubject } from 'subjecto/debug'
 ```
 
 ## Quick Start
@@ -167,11 +172,67 @@ handle.unsubscribe();
 - **Wildcard Support**: Use `*` and `**` patterns for flexible subscriptions
 - **Automatic Change Detection**: DeepSubject automatically detects nested mutations
 - **Error Resilient**: Subscriber errors don't break other subscriptions
-- **Debug Support**: Built-in debugging capabilities (stripped from production builds)
+- **Visual Debug UI**: Interactive debugging utility with real-time updates, history tracking, and value editing ([see Debug UI](#debug-ui))
 - **Memory Efficient**: Uses WeakMap for proxy caching with optimized path matching
 - **Circular Reference Safe**: Handles circular references gracefully
 - **SSR Compatible**: Works seamlessly with server-side rendering (Next.js, Remix, etc.)
 - **Production Optimized**: Debug code automatically stripped from production builds
+
+## Debug UI
+
+Subjecto includes a powerful visual debugging utility that provides real-time inspection of Subject instances with zero dependencies (pure vanilla JavaScript).
+
+### Features
+
+- 📊 **Real-time Updates** - Watch your Subject's state change live
+- 📜 **History Tracking** - Keep up to 50 entries of value changes with timestamps
+- 👥 **Subscriber List** - See all active subscriptions
+- ✏️ **Value Editor** - Manually update values via JSON input
+- ⏸ **Pause/Resume** - Freeze updates for inspection
+- 📋 **Copy to Clipboard** - Export current value as JSON
+- 🎨 **Dark Mode Support** - Matches your theme preference
+- 🗂 **Collapsible Sections** - Organize your debug view
+- 0️⃣ **Zero Dependencies** - Pure vanilla JS, no frameworks required
+
+### Basic Usage
+
+```typescript
+import { Subject } from 'subjecto'
+import { debugSubject } from 'subjecto/debug'
+
+const counter = new Subject(0, { name: 'counter' })
+
+// Mount debug UI to a DOM element
+const cleanup = debugSubject(
+  counter,
+  document.getElementById('debug-container')
+)
+
+// Update the subject normally
+counter.next(1)
+counter.next(2)
+
+// Later: cleanup when done
+cleanup()
+```
+
+### With Options
+
+```typescript
+debugSubject(subject, container, {
+  maxHistory: 100,        // Keep up to 100 history entries (default: 50)
+  darkMode: true,         // Enable dark mode (default: false)
+  title: 'My Counter',    // Custom title (default: subject name)
+  editable: true,         // Enable value editor (default: true)
+  collapsible: true,      // Enable collapsible sections (default: true)
+})
+```
+
+### Live Demo
+
+Open `examples/debug-demo.html` in your browser to see the debug UI in action with multiple interactive examples.
+
+**Learn more:** See the complete documentation in [`src/debug.README.md`](./src/debug.README.md)
 
 ## API Reference
 
