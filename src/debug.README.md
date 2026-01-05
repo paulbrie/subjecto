@@ -249,7 +249,9 @@ Click the pause button to freeze updates. Resume to continue tracking.
 
 ### View Toggle (Graph/List)
 Switch between list and graph views in the History section. Graph view automatically extracts numeric values and displays them as an interactive timeline chart with:
-- Time-based X-axis
+- **Auto-refresh**: Redraws every second to show latest data
+- **Time windows**: Select 30s, 60s, or 3 minutes of history
+- Time-based X-axis with formatted timestamps
 - Value-based Y-axis with labels
 - Grid lines for easy reading
 - Color-coded points (blue for historical, green for latest)
@@ -260,6 +262,8 @@ The graph supports:
 - **Booleans**: 1 for true, 0 for false
 - **Arrays**: Length of array
 - **Objects**: Number of keys
+
+Time window controls appear above the graph, letting you focus on recent activity (30s), medium-term trends (60s), or longer patterns (3m).
 
 ### Clear History
 Removes all history entries while keeping the current state.
