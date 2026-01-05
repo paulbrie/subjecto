@@ -74,6 +74,8 @@ export function debugSubject<T>(
     const history: HistoryEntry[] = []
     let isPaused = false
     let viewMode: 'list' | 'graph' = 'list'
+    let timeWindow: 30 | 60 | 180 = 30 // seconds
+    let graphInterval: number | null = null
 
     // Create UI structure
     const wrapper = document.createElement('div')
@@ -130,6 +132,12 @@ export function debugSubject<T>(
                 <span class="collapse-icon">▼</span>
             </div>
             <div class="section-content" data-section="history">
+                <div class="graph-controls" style="display: none;">
+                    <span class="graph-label">Time window:</span>
+                    <button class="btn btn-sm time-window-btn active" data-window="30">30s</button>
+                    <button class="btn btn-sm time-window-btn" data-window="60">60s</button>
+                    <button class="btn btn-sm time-window-btn" data-window="180">3m</button>
+                </div>
                 <canvas class="history-graph" width="600" height="200" style="display: none;"></canvas>
                 <div class="history-list"></div>
             </div>
@@ -159,6 +167,7 @@ export function debugSubject<T>(
     const valueTypeEl = wrapper.querySelector('.value-type') as HTMLElement
     const historyListEl = wrapper.querySelector('.history-list') as HTMLElement
     const historyGraphEl = wrapper.querySelector('.history-graph') as HTMLCanvasElement
+    const graphControlsEl = wrapper.querySelector('.graph-controls') as HTMLElement
     const historyCountEl = wrapper.querySelector('.history-count') as HTMLElement
     const subscribersListEl = wrapper.querySelector('.subscribers-list') as HTMLElement
     const valueEditor = wrapper.querySelector('.value-editor') as HTMLInputElement
@@ -208,10 +217,14 @@ export function debugSubject<T>(
         if (viewMode === 'graph') {
             historyListEl.style.display = 'none'
             historyGraphEl.style.display = 'block'
+            graphControlsEl.style.display = 'flex'
             drawGraph()
+            startGraphInterval()
         } else {
             historyListEl.style.display = 'block'
             historyGraphEl.style.display = 'none'
+            graphControlsEl.style.display = 'none'
+            stopGraphInterval()
             historyListEl.innerHTML = history
                 .map(
                     (entry, index) => `
@@ -225,6 +238,24 @@ export function debugSubject<T>(
             `
                 )
                 .join('')
+        }
+    }
+
+    // Start graph auto-refresh
+    function startGraphInterval() {
+        if (graphInterval !== null) return
+        graphInterval = window.setInterval(() => {
+            if (viewMode === 'graph' && !isPaused) {
+                drawGraph()
+            }
+        }, 1000)
+    }
+
+    // Stop graph auto-refresh
+    function stopGraphInterval() {
+        if (graphInterval !== null) {
+            clearInterval(graphInterval)
+            graphInterval = null
         }
     }
 
@@ -262,11 +293,26 @@ export function debugSubject<T>(
         ctx.fillStyle = bgColor
         ctx.fillRect(0, 0, width, height)
 
+        // Filter history by time window
+        const now = Date.now()
+        const windowMs = timeWindow * 1000
+        const filteredHistory = history.filter(entry =>
+            now - entry.timestamp.getTime() <= windowMs
+        )
+
+        if (filteredHistory.length === 0) {
+            ctx.fillStyle = textColor
+            ctx.font = '14px -apple-system, sans-serif'
+            ctx.textAlign = 'center'
+            ctx.fillText(`No data in last ${timeWindow}s`, width / 2, height / 2)
+            return
+        }
+
         // Extract numeric values or count changes
         const dataPoints: Array<{ x: number; y: number; entry: HistoryEntry }> = []
 
-        for (let i = history.length - 1; i >= 0; i--) {
-            const entry = history[i]
+        for (let i = filteredHistory.length - 1; i >= 0; i--) {
+            const entry = filteredHistory[i]
             let numValue: number | null = null
 
             if (typeof entry.value === 'number') {
@@ -479,6 +525,21 @@ export function debugSubject<T>(
         }
     }
 
+    function handleTimeWindowChange(window: 30 | 60 | 180) {
+        timeWindow = window
+
+        // Update button states
+        wrapper.querySelectorAll('.time-window-btn').forEach(btn => {
+            btn.classList.remove('active')
+        })
+        wrapper.querySelector(`[data-window="${window}"]`)?.classList.add('active')
+
+        // Redraw graph immediately
+        if (viewMode === 'graph') {
+            drawGraph()
+        }
+    }
+
     // Show notification
     function showNotification(message: string, type: 'success' | 'error' = 'success') {
         const notification = document.createElement('div')
@@ -520,6 +581,15 @@ export function debugSubject<T>(
         if (e.key === 'Enter') handleUpdate()
     })
 
+    // Time window buttons
+    wrapper.querySelectorAll('.time-window-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation()
+            const window = parseInt((btn as HTMLElement).getAttribute('data-window') || '30') as 30 | 60 | 180
+            handleTimeWindowChange(window)
+        })
+    })
+
     // Subscribe to subject changes
     const subscription = subject.subscribe(() => {
         updateUI()
@@ -532,6 +602,7 @@ export function debugSubject<T>(
 
     // Cleanup function
     return () => {
+        stopGraphInterval()
         subscription.unsubscribe()
         wrapper.remove()
     }
@@ -819,6 +890,47 @@ function injectStyles(darkMode: boolean) {
         .view-toggle {
             margin-left: auto;
             margin-right: 8px;
+        }
+
+        .graph-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #f6f8fa;
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+
+        .dark .graph-controls {
+            background: #161b22;
+        }
+
+        .graph-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #57606a;
+        }
+
+        .dark .graph-label {
+            color: #8b949e;
+        }
+
+        .time-window-btn {
+            padding: 4px 10px;
+            font-size: 11px;
+            min-width: 40px;
+        }
+
+        .time-window-btn.active {
+            background: #0969da;
+            color: white;
+            border-color: #0969da;
+        }
+
+        .dark .time-window-btn.active {
+            background: #58a6ff;
+            border-color: #58a6ff;
         }
 
         .history-item {

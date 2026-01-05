@@ -243,6 +243,8 @@ debugSubject(counter, document.getElementById('debug'))</pre>
             const history = []
             let isPaused = false
             let viewMode = 'list'
+            let timeWindow = 30
+            let graphInterval = null
 
             // Helper functions
             function formatValue(value) {
@@ -487,6 +489,40 @@ debugSubject(counter, document.getElementById('debug'))</pre>
                         margin-left: auto;
                         margin-right: 8px;
                     }
+                    .graph-controls {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        padding: 8px 12px;
+                        background: #f6f8fa;
+                        border-radius: 6px;
+                        margin-bottom: 12px;
+                    }
+                    .dark .graph-controls {
+                        background: #161b22;
+                    }
+                    .graph-label {
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: #57606a;
+                    }
+                    .dark .graph-label {
+                        color: #8b949e;
+                    }
+                    .time-window-btn {
+                        padding: 4px 10px;
+                        font-size: 11px;
+                        min-width: 40px;
+                    }
+                    .time-window-btn.active {
+                        background: #0969da;
+                        color: white;
+                        border-color: #0969da;
+                    }
+                    .dark .time-window-btn.active {
+                        background: #58a6ff;
+                        border-color: #58a6ff;
+                    }
                     .history-item {
                         padding: 8px;
                         margin-bottom: 8px;
@@ -663,6 +699,12 @@ debugSubject(counter, document.getElementById('debug'))</pre>
                         <span class="collapse-icon">▼</span>
                     </div>
                     <div class="section-content" data-section="history">
+                        <div class="graph-controls" style="display: none;">
+                            <span class="graph-label">Time window:</span>
+                            <button class="btn btn-sm time-window-btn active" data-window="30">30s</button>
+                            <button class="btn btn-sm time-window-btn" data-window="60">60s</button>
+                            <button class="btn btn-sm time-window-btn" data-window="180">3m</button>
+                        </div>
                         <canvas class="history-graph" width="600" height="200" style="display: none;"></canvas>
                         <div class="history-list"></div>
                     </div>
@@ -692,6 +734,7 @@ debugSubject(counter, document.getElementById('debug'))</pre>
             const valueTypeEl = wrapper.querySelector('.value-type')
             const historyListEl = wrapper.querySelector('.history-list')
             const historyGraphEl = wrapper.querySelector('.history-graph')
+            const graphControlsEl = wrapper.querySelector('.graph-controls')
             const historyCountEl = wrapper.querySelector('.history-count')
             const subscribersListEl = wrapper.querySelector('.subscribers-list')
             const valueEditor = wrapper.querySelector('.value-editor')
@@ -741,10 +784,14 @@ debugSubject(counter, document.getElementById('debug'))</pre>
                 if (viewMode === 'graph') {
                     historyListEl.style.display = 'none'
                     historyGraphEl.style.display = 'block'
+                    graphControlsEl.style.display = 'flex'
                     drawGraph()
+                    startGraphInterval()
                 } else {
                     historyListEl.style.display = 'block'
                     historyGraphEl.style.display = 'none'
+                    graphControlsEl.style.display = 'none'
+                    stopGraphInterval()
                     historyListEl.innerHTML = history
                         .map(
                             (entry, index) => `
@@ -758,6 +805,24 @@ debugSubject(counter, document.getElementById('debug'))</pre>
                     `
                         )
                         .join('')
+                }
+            }
+
+            // Start graph auto-refresh
+            function startGraphInterval() {
+                if (graphInterval !== null) return
+                graphInterval = setInterval(() => {
+                    if (viewMode === 'graph' && !isPaused) {
+                        drawGraph()
+                    }
+                }, 1000)
+            }
+
+            // Stop graph auto-refresh
+            function stopGraphInterval() {
+                if (graphInterval !== null) {
+                    clearInterval(graphInterval)
+                    graphInterval = null
                 }
             }
 
@@ -792,9 +857,24 @@ debugSubject(counter, document.getElementById('debug'))</pre>
                 ctx.fillStyle = bgColor
                 ctx.fillRect(0, 0, width, height)
 
+                // Filter history by time window
+                const now = Date.now()
+                const windowMs = timeWindow * 1000
+                const filteredHistory = history.filter(entry =>
+                    now - entry.timestamp.getTime() <= windowMs
+                )
+
+                if (filteredHistory.length === 0) {
+                    ctx.fillStyle = textColor
+                    ctx.font = '14px -apple-system, sans-serif'
+                    ctx.textAlign = 'center'
+                    ctx.fillText(`No data in last ${timeWindow}s`, width / 2, height / 2)
+                    return
+                }
+
                 const dataPoints = []
-                for (let i = history.length - 1; i >= 0; i--) {
-                    const entry = history[i]
+                for (let i = filteredHistory.length - 1; i >= 0; i--) {
+                    const entry = filteredHistory[i]
                     let numValue = null
 
                     if (typeof entry.value === 'number') {
@@ -952,6 +1032,21 @@ debugSubject(counter, document.getElementById('debug'))</pre>
                 updateHistoryUI()
             }
 
+            function handleTimeWindowChange(window) {
+                timeWindow = window
+
+                // Update button states
+                wrapper.querySelectorAll('.time-window-btn').forEach(btn => {
+                    btn.classList.remove('active')
+                })
+                wrapper.querySelector(`[data-window="${window}"]`).classList.add('active')
+
+                // Redraw graph immediately
+                if (viewMode === 'graph') {
+                    drawGraph()
+                }
+            }
+
             function handleCopy() {
                 const value = subject.getValue()
                 const text = JSON.stringify(value, null, 2)
@@ -1032,6 +1127,15 @@ debugSubject(counter, document.getElementById('debug'))</pre>
                 if (e.key === 'Enter') handleUpdate()
             })
 
+            // Time window buttons
+            wrapper.querySelectorAll('.time-window-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation()
+                    const window = parseInt(btn.getAttribute('data-window') || '30')
+                    handleTimeWindowChange(window)
+                })
+            })
+
             // Subscribe to subject changes
             const subscription = subject.subscribe(() => {
                 updateUI()
@@ -1044,6 +1148,7 @@ debugSubject(counter, document.getElementById('debug'))</pre>
 
             // Cleanup function
             return () => {
+                stopGraphInterval()
                 subscription.unsubscribe()
                 wrapper.remove()
             }
