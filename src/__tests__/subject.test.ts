@@ -348,3 +348,82 @@ describe('Subject debug logging', () => {
         );
     });
 })
+
+describe('error handling in subscribers', () => {
+    beforeEach(() => {
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        (console.error as jest.Mock).mockRestore();
+    });
+
+    test('should catch and log errors thrown in subscribe callback', () => {
+        const subject = new Subject('test');
+        const errorMessage = 'Subscribe callback error';
+
+        // This should not throw, error should be caught
+        expect(() => {
+            subject.subscribe(() => {
+                throw new Error(errorMessage);
+            });
+        }).not.toThrow();
+
+        // Error should be logged in development
+        expect(console.error).toHaveBeenCalledWith('Error in subscriber:', expect.any(Error));
+    });
+
+    test('should catch and log errors thrown in next() subscribers', () => {
+        const subject = new Subject('test');
+        const errorMessage = 'Next callback error';
+
+        let callCount = 0;
+        subject.subscribe(() => {
+            callCount++;
+            if (callCount > 1) {
+                throw new Error(errorMessage);
+            }
+        });
+
+        // First call works (initial subscribe)
+        expect(callCount).toBe(1);
+
+        // Second call throws but should be caught
+        expect(() => {
+            subject.next('new value');
+        }).not.toThrow();
+
+        expect(console.error).toHaveBeenCalledWith('Error in subscriber:', expect.any(Error));
+        expect(callCount).toBe(2);
+    });
+
+    test('should catch and log errors thrown in once() callback', () => {
+        const subject = new Subject('test');
+        const errorMessage = 'Once callback error';
+
+        // This should not throw, error should be caught
+        expect(() => {
+            subject.once(() => {
+                throw new Error(errorMessage);
+            });
+        }).not.toThrow();
+
+        expect(console.error).toHaveBeenCalledWith('Error in subscriber:', expect.any(Error));
+    });
+
+    test('should not break other subscribers when one throws', () => {
+        const subject = new Subject('test');
+        const goodCallback = jest.fn();
+
+        subject.subscribe(() => {
+            throw new Error('Bad subscriber');
+        });
+        subject.subscribe(goodCallback);
+
+        subject.next('new value');
+
+        // Good callback should still be called despite error in first subscriber
+        expect(goodCallback).toHaveBeenCalledWith('new value');
+        expect(console.error).toHaveBeenCalled();
+    });
+})

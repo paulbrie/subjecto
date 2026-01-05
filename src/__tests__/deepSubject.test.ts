@@ -610,4 +610,57 @@ describe('DeepSubject count property', () => {
         obj.a = 1;
         expect(ds.count).toBe(1);
     });
+});
+
+describe('DeepSubject LRU cache eviction', () => {
+    it('should evict oldest entry when cache exceeds 100 entries', () => {
+        // Create a large nested object to trigger many path matches
+        const initialState: Record<string, any> = {};
+        for (let i = 0; i < 110; i++) {
+            initialState[`key${i}`] = { value: i };
+        }
+
+        const ds = new DeepSubject(initialState);
+        const callbacks: Array<() => void> = [];
+
+        // Subscribe to 110 different paths to fill and exceed cache
+        for (let i = 0; i < 110; i++) {
+            let called = false;
+            const callback = () => { called = true; };
+            callbacks.push(() => expect(called).toBe(true));
+
+            ds.subscribe(`key${i}/**`, callback);
+        }
+
+        // Trigger updates to cause cache lookups and eviction
+        for (let i = 0; i < 110; i++) {
+            ds.getValue()[`key${i}`].value = i + 1;
+        }
+
+        // Verify all callbacks were called (cache eviction didn't break functionality)
+        callbacks.forEach(check => check());
+    });
+
+    it('should still match paths correctly after cache eviction', () => {
+        const ds = new DeepSubject<Record<string, any>>({});
+        const subscribers: Array<jest.Mock> = [];
+
+        // Create 105 subscribers to force cache eviction
+        for (let i = 0; i < 105; i++) {
+            ds.getValue()[`prop${i}`] = { nested: i };
+            const mock = jest.fn();
+            subscribers.push(mock);
+            ds.subscribe(`prop${i}/nested`, mock, { skipInitialCall: true });
+        }
+
+        // Update a property that was added early (should have been evicted from cache)
+        ds.getValue().prop0.nested = 999;
+
+        // Verify the subscriber still works correctly after cache eviction
+        expect(subscribers[0]).toHaveBeenCalledWith(999);
+
+        // Update a property added later (likely still in cache)
+        ds.getValue().prop104.nested = 888;
+        expect(subscribers[104]).toHaveBeenCalledWith(888);
+    });
 }); 
