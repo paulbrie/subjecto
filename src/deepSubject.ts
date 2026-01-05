@@ -1,12 +1,8 @@
 export type DeepSubjectSubscription = (value: unknown) => void;
-import { DEFAULT_NAME, DEFAULT_UPDATE_IF_STRICTLY_EQUAL } from './subject';
 
 export type Path = string;
 export type DeepValue = object;
-/**
- * Handle returned by DeepSubject.subscribe for unsubscribing from updates.
- * @public
- */
+
 export type DeepSubscriptionHandle = {
     unsubscribe: () => void;
 };
@@ -16,41 +12,80 @@ export interface DeepSubjectConstructorOptions {
     updateIfStrictlyEqual?: boolean;
 }
 
-/**
- * Callback function for DeepSubject subscriptions.
- */
+const DEFAULT_NAME = 'noName'
+const DEFAULT_UPDATE_IF_STRICTLY_EQUAL = true
+const DEV = process.env.NODE_ENV !== 'production'
+
+// Optimized path matching with memoization for common patterns
+const matchCache = new Map<string, boolean>()
+const CACHE_SIZE_LIMIT = 100
 
 function matchPath(pattern: string, path: string): boolean {
-    const patternParts = pattern.split('/');
-    const pathParts = path.split('/');
+    const cacheKey = `${pattern}:${path}`
+    const cached = matchCache.get(cacheKey)
+    if (cached !== undefined) return cached
 
-    // Handle root level **
-    if (pattern === '**') return true;
+    let result: boolean
 
-    let i = 0, j = 0;
+    // Fast path for exact matches
+    if (pattern === path) {
+        result = true
+    }
+    // Fast path for root wildcard
+    else if (pattern === '**') {
+        result = true
+    }
+    // Fast path for simple wildcards without recursion
+    else if (!pattern.includes('**')) {
+        const patternParts = pattern.split('/')
+        const pathParts = path.split('/')
+
+        if (patternParts.length !== pathParts.length) {
+            result = false
+        } else {
+            result = patternParts.every((p, i) => p === '*' || p === pathParts[i])
+        }
+    }
+    // Full matching for complex patterns
+    else {
+        result = matchPathRecursive(pattern, path)
+    }
+
+    // LRU cache management
+    if (matchCache.size >= CACHE_SIZE_LIMIT) {
+        const firstKey = matchCache.keys().next().value
+        matchCache.delete(firstKey!)
+    }
+    matchCache.set(cacheKey, result)
+
+    return result
+}
+
+function matchPathRecursive(pattern: string, path: string): boolean {
+    const patternParts = pattern.split('/')
+    const pathParts = path.split('/')
+
+    let i = 0, j = 0
     while (i < patternParts.length && j < pathParts.length) {
         if (patternParts[i] === '**') {
-            // If ** is the last pattern part, it matches everything
-            if (i === patternParts.length - 1) return true;
-            // Try to find a match for the next pattern part
+            if (i === patternParts.length - 1) return true
             while (j < pathParts.length) {
-                if (matchPath(patternParts.slice(i + 1).join('/'), pathParts.slice(j).join('/'))) {
-                    return true;
+                if (matchPathRecursive(patternParts.slice(i + 1).join('/'), pathParts.slice(j).join('/'))) {
+                    return true
                 }
-                j++;
+                j++
             }
-            return false;
+            return false
         } else if (patternParts[i] === '*' || patternParts[i] === pathParts[j]) {
-            i++;
-            j++;
+            i++
+            j++
         } else {
-            return false;
+            return false
         }
     }
 
-    // Handle trailing ** in pattern
-    while (i < patternParts.length && patternParts[i] === '**') i++;
-    return i === patternParts.length && j === pathParts.length;
+    while (i < patternParts.length && patternParts[i] === '**') i++
+    return i === patternParts.length && j === pathParts.length
 }
 
 export { matchPath };
@@ -60,12 +95,13 @@ export class DeepSubject<T extends DeepValue> {
     private subscribers: Map<Path, Set<DeepSubjectSubscription>>;
     private proxyCache: WeakMap<object, object>;
     private options: DeepSubjectConstructorOptions;
+
     /**
-     * Enables debug logs
+     * Enables debug logs (only works in development mode)
      */
     debug: boolean | ((nextValue: T) => void);
     /**
-     * A function that is called before the value changes. Can be used to check/process/format the new value before updating the subscribers.
+     * A function that is called before the value changes.
      */
     before: (nextValue: T) => T;
     /**
@@ -78,7 +114,7 @@ export class DeepSubject<T extends DeepValue> {
         this.subscribers = new Map();
         this.proxyCache = new WeakMap();
         this.options = {
-            name: options?.name || DEFAULT_NAME,
+            name: options?.name ?? DEFAULT_NAME,
             updateIfStrictlyEqual: options?.updateIfStrictlyEqual ?? DEFAULT_UPDATE_IF_STRICTLY_EQUAL,
         };
         this.debug = false;
@@ -111,18 +147,17 @@ export class DeepSubject<T extends DeepValue> {
     }
 
     private createProxy(obj: object, parentPath: string): object {
-        if (this.proxyCache.has(obj)) {
-            return this.proxyCache.get(obj)!;
-        }
+        const cached = this.proxyCache.get(obj)
+        if (cached) return cached
 
         const handler: ProxyHandler<object> = {
             get: (target: object, prop: string | symbol) => {
                 const value = target[prop as keyof typeof target];
-                // If value is an object, proxy it
+
                 if (value && typeof value === 'object') {
                     return this.createProxy(value, `${parentPath}/${prop.toString()}`);
                 }
-                // If target is an array and prop is a mutating method, wrap it
+
                 if (Array.isArray(target) && typeof prop === 'string' && [
                     'push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'
                 ].includes(prop)) {
@@ -151,69 +186,55 @@ export class DeepSubject<T extends DeepValue> {
     }
 
     private notifySubscribers(path: string) {
-        // Notify exact path subscribers
-        const subscribers = this.subscribers.get(path);
-        if (subscribers) {
-            const value = this.getValueAtPath(path);
-            subscribers.forEach((subscriber) => {
+        const notifySet = (subs: Set<DeepSubjectSubscription>, value: unknown) => {
+            subs.forEach((subscriber) => {
                 try {
                     subscriber(value);
                 } catch (error) {
-                    console.error('Error in subscriber:', error);
+                    if (DEV) {
+                        console.error('Error in subscriber:', error);
+                    }
                 }
             });
         }
 
+        // Notify exact path subscribers
+        const subscribers = this.subscribers.get(path);
+        if (subscribers) {
+            const value = this.getValueAtPath(path);
+            notifySet(subscribers, value)
+        }
+
         // Notify wildcard subscribers
-        for (const [pattern, subscribers] of Array.from(this.subscribers.entries())) {
-            if (pattern !== path) {
-                if (pattern === '**') {
-                    // Root level ** should always get the root object
-                    const value = this.value;
-                    if (value !== undefined) {
-                        subscribers.forEach((subscriber) => {
-                            try {
-                                subscriber(value);
-                            } catch (error) {
-                                console.error('Error in subscriber:', error);
-                            }
-                        });
-                    }
-                } else if (matchPath(pattern, path)) {
-                    const patternParts = pattern.split('/');
-                    let value: DeepValue | undefined;
+        for (const [pattern, subs] of Array.from(this.subscribers.entries())) {
+            if (pattern === path) continue
 
-                    if (patternParts.includes('*')) {
-                        // For * pattern, get the direct child value
-                        const pathParts = path.split('/');
-                        const parentPath = pathParts.slice(0, -1).join('/');
-                        const childName = pathParts[pathParts.length - 1];
-                        value = this.getValueAtPath(`${parentPath}/${childName}`);
-                    } else if (patternParts.includes('**')) {
-                        // For user/**, always return getValueAtPath('user')
-                        const patternIndex = patternParts.indexOf('**');
-                        const beforeWildcard = patternParts.slice(0, patternIndex).join('/');
-                        value = this.getValueAtPath(beforeWildcard);
-                    }
+            if (pattern === '**') {
+                notifySet(subs, this.value)
+            } else if (matchPath(pattern, path)) {
+                const patternParts = pattern.split('/');
+                let value: DeepValue | undefined;
 
-                    if (value !== undefined) {
-                        subscribers.forEach((subscriber) => {
-                            try {
-                                subscriber(value);
-                            } catch (error) {
-                                console.error('Error in subscriber:', error);
-                            }
-                        });
-                    }
+                if (patternParts.includes('*')) {
+                    const pathParts = path.split('/');
+                    const parentPath = pathParts.slice(0, -1).join('/');
+                    const childName = pathParts[pathParts.length - 1];
+                    value = this.getValueAtPath(`${parentPath}/${childName}`);
+                } else if (patternParts.includes('**')) {
+                    const patternIndex = patternParts.indexOf('**');
+                    const beforeWildcard = patternParts.slice(0, patternIndex).join('/');
+                    value = this.getValueAtPath(beforeWildcard);
+                }
+
+                if (value !== undefined) {
+                    notifySet(subs, value)
                 }
             }
         }
     }
 
     private getValueAtPath(path: string): DeepValue | undefined {
-        if (path === '') {
-            return this.value;
-        }
+        if (path === '') return this.value
 
         const parts = path.split('/');
         let current: DeepValue | undefined = this.value;
@@ -238,18 +259,14 @@ export class DeepSubject<T extends DeepValue> {
         }
         this.subscribers.get(pattern)!.add(subscriber);
 
-        // Notify immediately with the current value (unless skipInitialCall is true)
         if (!options?.skipInitialCall) {
-            let value: DeepValue | undefined;
-            if (pattern === '**') {
-                value = this.value;
-            } else {
-                value = this.getValueAtPath(pattern);
-            }
+            const value = pattern === '**' ? this.value : this.getValueAtPath(pattern)
             try {
                 subscriber(value);
             } catch (error) {
-                console.error('Error in subscriber:', error);
+                if (DEV) {
+                    console.error('Error in subscriber:', error);
+                }
             }
         }
 
@@ -281,35 +298,29 @@ export class DeepSubject<T extends DeepValue> {
         for (const [pattern, subscribers] of Array.from(this.subscribers.entries())) {
             const value = this.getValueAtPath(pattern);
             if (value !== undefined) {
-                subscribers.forEach((subscriber) => {
+                subscribers.forEach((subscriber: DeepSubjectSubscription) => {
                     try {
                         subscriber(value);
                     } catch (error) {
-                        console.error('Error in subscriber:', error);
+                        if (DEV) {
+                            console.error('Error in subscriber:', error);
+                        }
                     }
                 });
             }
         }
 
-        if (this.debug) {
+        if (DEV && this.debug) {
             if (typeof this.debug === "function") {
                 this.debug(nextValue);
             } else {
                 console.log(`\n--- SUBJECTO DEBUG: \`${this.options.name}\` ---`);
                 console.log(` ├ nextValue:`, nextValue);
-                console.log(
-                    ` └ subscribers(${this.subscribers.size}): `,
-                    this,
-                    "\n"
-                );
+                console.log(` └ subscribers(${this.subscribers.size}): `, this, "\n");
             }
         }
     }
 
-    /**
-     * Unsubscribe a callback from all paths/patterns.
-     * @param subscriber The callback function to remove from all subscriptions.
-     */
     unsubscribe(subscriber: DeepSubjectSubscription): void {
         for (const [pattern, subscribers] of Array.from(this.subscribers.entries())) {
             subscribers.delete(subscriber);
@@ -318,4 +329,4 @@ export class DeepSubject<T extends DeepValue> {
             }
         }
     }
-} 
+}
