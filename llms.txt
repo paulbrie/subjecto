@@ -1,0 +1,330 @@
+# Subjecto
+
+> Minimalistic, zero-dependency TypeScript state management library. Two primitives: Subject<T> (flat reactive values) and DeepSubject<T> (proxy-based nested object observation with path subscriptions).
+
+## Install
+
+npm install subjecto
+
+## Entry Points
+
+| Import path | What you get | Size (gzip) |
+|---|---|---|
+| `subjecto` | Subject + DeepSubject + batch + helpers | 1.8KB |
+| `subjecto/core` | Subject only | 0.6KB |
+| `subjecto/helpers` | nextAssign, nextPush, toggle, once, complete | 0.3KB |
+| `subjecto/react` | useSubject, useDeepSubject, useDeepSubjectSelector, Paths, PathValue types | 0.5KB |
+| `subjecto/debug` | debugSubject (dev-only visual UI) | 7KB |
+
+## Subject<T> — flat reactive value
+
+```typescript
+import { Subject } from 'subjecto'
+
+// Create
+const count = new Subject<number>(0)
+const user = new Subject({ name: 'Alice', age: 30 }, { name: 'user' })
+
+// Subscribe (callback fires immediately with current value)
+const handle = count.subscribe((value) => console.log(value))
+
+// Update
+count.next(1)
+
+// Read
+count.getValue() // 1
+
+// Unsubscribe
+handle.unsubscribe()
+
+// Unsubscribe all
+count.complete()
+```
+
+### Subject methods
+
+```typescript
+subject.next(value: T): void                    // Set new value, notify subscribers
+subject.getValue(): T                            // Get current value
+subject.subscribe(cb: (v: T) => void): handle   // Subscribe; cb called immediately with current value
+subject.unsubscribe(id: symbol): boolean         // Unsubscribe by ID
+subject.complete(): void                         // Remove all subscribers
+subject.nextAssign(partial: Partial<T>): void    // Object.assign merge (throws if not object)
+subject.nextPush(item: unknown): void            // Array push (throws if not array)
+subject.toggle(): void                           // Flip boolean (throws if not boolean)
+subject.once(cb: (v: T) => void): void           // Subscribe once, auto-unsubscribe after first call
+```
+
+### Subject properties
+
+```typescript
+subject.subscribers    // Map<symbol, callback> — all active subscriptions
+subject.count          // number — update count (starts at 1)
+subject.debug          // boolean | ((v: T) => void) — enable debug logging (dev only)
+subject.before         // (v: T) => T — transform value before setting
+subject.options        // { name?: string, updateIfStrictlyEqual?: boolean }
+```
+
+### Constructor options
+
+```typescript
+new Subject<T>(initialValue: T, options?: {
+  name?: string                    // Debug name (default: 'noName')
+  updateIfStrictlyEqual?: boolean  // Notify even if value === prev (default: true)
+})
+```
+
+## DeepSubject<T> — proxy-based nested observation
+
+```typescript
+import { DeepSubject } from 'subjecto'
+
+const state = new DeepSubject({
+  user: { name: 'Alice', age: 30 },
+  cart: { items: [], total: 0 },
+})
+
+// Subscribe to a path (callback fires immediately)
+const handle = state.subscribe('user/name', (name) => console.log(name))
+
+// Mutate through proxy — triggers subscribers automatically
+state.getValue().user.name = 'Bob'
+
+// Array mutations also trigger subscribers
+state.getValue().cart.items.push({ id: 1, price: 10 })
+
+// Unsubscribe
+handle.unsubscribe()
+
+// Unsubscribe all
+state.complete()
+```
+
+### Path patterns
+
+```
+"user/name"     — exact path
+"user/*"        — any direct child of user
+"user/**"       — any descendant of user at any depth
+"**"            — all changes everywhere
+```
+
+### DeepSubject methods
+
+```typescript
+state.subscribe(pattern: string, cb: (v: unknown) => void, opts?): handle
+state.getValue(): T                  // Returns proxied object — mutations trigger subscriptions
+state.next(newValue: T): void        // Replace entire state
+state.complete(): void               // Remove all subscribers
+state.unsubscribe(cb): void          // Remove a specific callback from all patterns
+```
+
+### Subscribe options
+
+```typescript
+state.subscribe('path', callback, { skipInitialCall: true })
+// skipInitialCall: don't fire callback immediately (useful for React integration)
+```
+
+## batch() — coalesce mutations
+
+```typescript
+import { batch } from 'subjecto'
+
+// Without batch: two notification cycles
+state.getValue().user.name = 'Bob'
+state.getValue().user.age = 31
+
+// With batch: one notification cycle, deduplicated per path
+batch(() => {
+  state.getValue().user.name = 'Bob'
+  state.getValue().user.age = 31
+})
+
+// Nested batches flush only when outermost completes
+```
+
+## React Hooks
+
+Requires React >= 18 (peer dependency, optional).
+
+### useSubject
+
+```tsx
+import { Subject } from 'subjecto'
+import { useSubject } from 'subjecto/react'
+
+// Create OUTSIDE components
+const countSubject = new Subject(0)
+
+function Counter() {
+  const [count, setCount] = useSubject(countSubject)
+  return <button onClick={() => setCount(count + 1)}>{count}</button>
+}
+```
+
+### useDeepSubject — type-safe path subscription
+
+```tsx
+import { DeepSubject } from 'subjecto'
+import { useDeepSubject } from 'subjecto/react'
+
+const appState = new DeepSubject({
+  user: { name: 'Alice', profile: { bio: 'Engineer' } },
+  cart: { items: [] as Array<{ id: number; price: number }> },
+})
+
+function UserName() {
+  // TypeScript infers [string, (v: string) => void]
+  const [name, setName] = useDeepSubject(appState, 'user/name')
+  return <button onClick={() => setName('Bob')}>{name}</button>
+}
+
+function Profile() {
+  // TypeScript infers [{ bio: string }, setter]
+  const [profile] = useDeepSubject(appState, 'user/profile')
+  return <p>{profile.bio}</p>
+}
+```
+
+### useDeepSubjectSelector — derived values
+
+```tsx
+import { useDeepSubjectSelector } from 'subjecto/react'
+
+function CartTotal() {
+  const total = useDeepSubjectSelector(
+    appState,
+    'cart/items',
+    (items) => items.reduce((sum, item) => sum + item.price, 0),
+  )
+  return <p>Total: ${total}</p>
+}
+
+// Custom equality function (default: shallow equality)
+const count = useDeepSubjectSelector(
+  appState, 'cart/items',
+  (items) => items.length,
+  (a, b) => a === b,
+)
+```
+
+### React type utilities
+
+```typescript
+import type { Paths, PathValue } from 'subjecto/react'
+
+interface AppState {
+  user: { name: string; age: number }
+  cart: { items: Array<{ id: number }> }
+}
+
+type P = Paths<AppState>
+// "user" | "user/name" | "user/age" | "cart" | "cart/items"
+
+type V = PathValue<AppState, 'user/name'>
+// string
+```
+
+## Tree-shakeable helpers
+
+Standalone functions that delegate to Subject methods. Import from `subjecto/helpers` for smallest bundle, or from `subjecto` for convenience.
+
+```typescript
+import { nextAssign, nextPush, toggle, once, complete } from 'subjecto/helpers'
+
+const obj = new Subject({ a: 1, b: 2 })
+nextAssign(obj, { b: 3 })  // { a: 1, b: 3 }
+
+const arr = new Subject([1, 2])
+nextPush(arr, 3)            // [1, 2, 3]
+
+const flag = new Subject(false)
+toggle(flag)                // true
+
+const s = new Subject(0)
+once(s, (v) => console.log(v))  // fires once, then auto-unsubscribes
+
+complete(s)                 // removes all subscribers
+```
+
+## Common Mistakes
+
+WRONG: Creating subjects inside React components (recreated every render)
+```tsx
+// BAD
+function App() {
+  const subject = new Subject(0)  // new instance every render!
+  const [val] = useSubject(subject)
+}
+```
+
+RIGHT: Create subjects outside components
+```tsx
+const subject = new Subject(0)
+function App() {
+  const [val] = useSubject(subject)
+}
+```
+
+---
+
+WRONG: Importing React hooks from wrong path
+```tsx
+import { useSubject } from 'subjecto'  // does NOT export hooks
+```
+
+RIGHT:
+```tsx
+import { useSubject } from 'subjecto/react'
+```
+
+---
+
+WRONG: Mutating DeepSubject value without going through proxy
+```tsx
+const raw = { ...state.getValue() }
+raw.user.name = 'Bob'  // no proxy — subscribers NOT notified
+```
+
+RIGHT: Mutate through getValue() proxy
+```tsx
+state.getValue().user.name = 'Bob'  // proxy intercepts — subscribers notified
+```
+
+---
+
+WRONG: Subscribing to array indices
+```tsx
+state.subscribe('cart/items/0', cb)  // does NOT work
+```
+
+RIGHT: Subscribe to the array itself
+```tsx
+state.subscribe('cart/items', cb)
+```
+
+---
+
+WRONG: toggle() on non-boolean (throws Error)
+```tsx
+const s = new Subject('hello')
+s.toggle()  // throws: "Subject value must be a boolean"
+```
+
+---
+
+NOTE: subscribe() calls the callback immediately with the current value.
+Use { skipInitialCall: true } if you don't want this (DeepSubject only).
+
+NOTE: Paths use forward slashes, not dots: "user/name" not "user.name"
+
+NOTE: Circular references in DeepSubject are safe (proxy cache prevents infinite recursion).
+
+## Optional: llms-full.txt
+
+- [API source: Subject](https://github.com/paulbrie/subjecto/blob/master/src/subject.ts)
+- [API source: DeepSubject](https://github.com/paulbrie/subjecto/blob/master/src/deepSubject.ts)
+- [API source: React hooks](https://github.com/paulbrie/subjecto/blob/master/src/react/useDeepSubject.ts)
+- [API source: Helpers](https://github.com/paulbrie/subjecto/blob/master/src/helpers.ts)
+- [API source: Types](https://github.com/paulbrie/subjecto/blob/master/src/react/types.ts)
