@@ -25,11 +25,7 @@ export function nextAssign<T extends object>(
   subject: Subject<T>,
   newValue: Partial<T>
 ): void {
-  const currentValue = subject.getValue()
-  if (typeof currentValue !== 'object' || currentValue === null) {
-    throw new Error('Subject value must be an object')
-  }
-  subject.next(Object.assign({}, currentValue, newValue))
+  subject.nextAssign(newValue)
 }
 
 /**
@@ -49,11 +45,7 @@ export function nextAssign<T extends object>(
  * ```
  */
 export function nextPush<T>(subject: Subject<T[]>, value: T): void {
-  const currentValue = subject.getValue()
-  if (!Array.isArray(currentValue)) {
-    throw new Error('Subject value must be an array')
-  }
-  subject.next([...currentValue, value])
+  subject.nextPush(value)
 }
 
 /**
@@ -73,11 +65,7 @@ export function nextPush<T>(subject: Subject<T[]>, value: T): void {
  * ```
  */
 export function toggle(subject: Subject<boolean>): void {
-  const currentValue = subject.getValue()
-  if (typeof currentValue !== 'boolean') {
-    throw new Error('Subject value must be a boolean')
-  }
-  subject.next(!currentValue)
+  subject.toggle()
 }
 
 /**
@@ -101,10 +89,7 @@ export function once<T>(
   subject: Subject<T>,
   callback: (value: T) => void
 ): void {
-  const handle = subject.subscribe((value) => {
-    callback(value)
-    handle.unsubscribe()
-  })
+  subject.once(callback)
 }
 
 /**
@@ -122,8 +107,5 @@ export function once<T>(
  * ```
  */
 export function complete<T>(subject: Subject<T>): void {
-  const subscribers = Array.from(subject.subscribers.keys())
-  subscribers.forEach((id) => {
-    subject.unsubscribe(id)
-  })
+  subject.complete()
 }

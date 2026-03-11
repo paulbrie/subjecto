@@ -73,16 +73,17 @@ export function debugSubject<T>(
 
     const history: HistoryEntry[] = []
     let isPaused = false
-    let viewMode: 'list' | 'graph' = 'list'
+    let viewMode: 'list' | 'graph' = 'graph' // Default to graph view
     let timeWindow: 30 | 60 | 180 = 30 // seconds
-    let graphInterval: number | null = null
+    let hoveredPoint: { x: number; y: number; value: unknown; entry: HistoryEntry } | null = null
+    let graphDataPoints: Array<{ screenX: number; screenY: number; value: number; entry: HistoryEntry }> = []
 
     // Create UI structure
     const wrapper = document.createElement('div')
     wrapper.className = `subjecto-debug ${darkMode ? 'dark' : 'light'}`
     wrapper.innerHTML = `
         <div class="debug-header">
-            <h3 class="debug-title">${title}</h3>
+            <h3 class="debug-title">${title} <span class="debug-type"></span></h3>
             <div class="debug-actions">
                 <button class="btn btn-sm" data-action="pause">⏸ Pause</button>
                 <button class="btn btn-sm" data-action="clear">🗑 Clear</button>
@@ -91,44 +92,10 @@ export function debugSubject<T>(
         </div>
 
         <div class="debug-section">
-            <div class="section-header ${collapsible ? 'collapsible' : ''}" data-section="current">
-                <span class="section-title">📊 Current State</span>
-                <span class="collapse-icon">▼</span>
-            </div>
-            <div class="section-content" data-section="current">
-                <div class="stat-grid">
-                    <div class="stat">
-                        <span class="stat-label">Value:</span>
-                        <code class="stat-value current-value"></code>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-label">Subscribers:</span>
-                        <span class="stat-value subscriber-count badge"></span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-label">Updates:</span>
-                        <span class="stat-value update-count badge"></span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-label">Type:</span>
-                        <span class="stat-value value-type badge"></span>
-                    </div>
-                </div>
-                ${editable ? `
-                <div class="editor-section">
-                    <label class="editor-label">Edit Value:</label>
-                    <input type="text" class="value-editor" placeholder="Enter new value (JSON)">
-                    <button class="btn btn-primary btn-sm" data-action="update">Update</button>
-                </div>
-                ` : ''}
-            </div>
-        </div>
-
-        <div class="debug-section">
             <div class="section-header ${collapsible ? 'collapsible' : ''}" data-section="history">
                 <span class="section-title">📜 History</span>
                 <span class="history-count badge">0</span>
-                <button class="btn btn-sm view-toggle" data-action="toggle-view">📊 Graph</button>
+                <button class="btn btn-sm view-toggle" data-action="toggle-view">📋 List</button>
                 <span class="collapse-icon">▼</span>
             </div>
             <div class="section-content" data-section="history">
@@ -138,7 +105,10 @@ export function debugSubject<T>(
                     <button class="btn btn-sm time-window-btn" data-window="60">60s</button>
                     <button class="btn btn-sm time-window-btn" data-window="180">3m</button>
                 </div>
-                <canvas class="history-graph" width="600" height="200" style="display: none;"></canvas>
+                <div class="graph-container" style="position: relative;">
+                    <canvas class="history-graph" width="600" height="200" style="display: none;"></canvas>
+                    <div class="graph-tooltip" style="display: none;"></div>
+                </div>
                 <div class="history-list"></div>
             </div>
         </div>
@@ -161,32 +131,25 @@ export function debugSubject<T>(
     container.appendChild(wrapper)
 
     // Get DOM references
-    const currentValueEl = wrapper.querySelector('.current-value') as HTMLElement
-    const subscriberCountEl = wrapper.querySelector('.subscriber-count') as HTMLElement
-    const updateCountEl = wrapper.querySelector('.update-count') as HTMLElement
-    const valueTypeEl = wrapper.querySelector('.value-type') as HTMLElement
+    const debugTypeEl = wrapper.querySelector('.debug-type') as HTMLElement
     const historyListEl = wrapper.querySelector('.history-list') as HTMLElement
     const historyGraphEl = wrapper.querySelector('.history-graph') as HTMLCanvasElement
     const graphControlsEl = wrapper.querySelector('.graph-controls') as HTMLElement
     const historyCountEl = wrapper.querySelector('.history-count') as HTMLElement
     const subscribersListEl = wrapper.querySelector('.subscribers-list') as HTMLElement
-    const valueEditor = wrapper.querySelector('.value-editor') as HTMLInputElement
     const pauseBtn = wrapper.querySelector('[data-action="pause"]') as HTMLButtonElement
     const viewToggleBtn = wrapper.querySelector('[data-action="toggle-view"]') as HTMLButtonElement
+    const tooltipEl = wrapper.querySelector('.graph-tooltip') as HTMLElement
 
     // Update UI function
     function updateUI() {
         if (isPaused) return
 
         const value = subject.getValue()
-        const count = subject.count
-        const subscriberCount = subject.subscribers.size
+        const valueType = getValueType(value)
 
-        // Update current state
-        currentValueEl.textContent = formatValue(value)
-        subscriberCountEl.textContent = subscriberCount.toString()
-        updateCountEl.textContent = count.toString()
-        valueTypeEl.textContent = getValueType(value)
+        // Update type in header
+        debugTypeEl.textContent = `(${valueType})`
 
         // Update subscribers list
         updateSubscribersList()
@@ -219,12 +182,10 @@ export function debugSubject<T>(
             historyGraphEl.style.display = 'block'
             graphControlsEl.style.display = 'flex'
             drawGraph()
-            startGraphInterval()
         } else {
             historyListEl.style.display = 'block'
             historyGraphEl.style.display = 'none'
             graphControlsEl.style.display = 'none'
-            stopGraphInterval()
             historyListEl.innerHTML = history
                 .map(
                     (entry, index) => `
@@ -241,30 +202,15 @@ export function debugSubject<T>(
         }
     }
 
-    // Start graph auto-refresh
-    function startGraphInterval() {
-        if (graphInterval !== null) return
-        graphInterval = window.setInterval(() => {
-            if (viewMode === 'graph' && !isPaused) {
-                drawGraph()
-            }
-        }, 1000)
-    }
-
-    // Stop graph auto-refresh
-    function stopGraphInterval() {
-        if (graphInterval !== null) {
-            clearInterval(graphInterval)
-            graphInterval = null
-        }
-    }
-
     // Draw history graph
     function drawGraph() {
         if (!historyGraphEl || history.length === 0) return
 
         const ctx = historyGraphEl.getContext('2d')
         if (!ctx) return
+
+        // Clear stored data points for hit detection
+        graphDataPoints = []
 
         // Get colors based on theme
         const isDark = darkMode
@@ -425,6 +371,14 @@ export function debugSubject<T>(
             const y = yScale(point.y)
             const isLatest = i === dataPoints.length - 1
 
+            // Store screen coordinates for hit detection
+            graphDataPoints.push({
+                screenX: x,
+                screenY: y,
+                value: point.y,
+                entry: point.entry
+            })
+
             ctx.fillStyle = isLatest ? latestPointColor : pointColor
             ctx.beginPath()
             ctx.arc(x, y, isLatest ? 5 : 3, 0, Math.PI * 2)
@@ -501,19 +455,6 @@ export function debugSubject<T>(
         })
     }
 
-    function handleUpdate() {
-        if (!valueEditor || !editable) return
-
-        try {
-            const newValue = JSON.parse(valueEditor.value)
-            subject.next(newValue as T)
-            valueEditor.value = ''
-            showNotification('Value updated!')
-        } catch {
-            showNotification('Invalid JSON', 'error')
-        }
-    }
-
     function handleCollapse(sectionName: string) {
         const content = wrapper.querySelector(
             `.section-content[data-section="${sectionName}"]`
@@ -564,7 +505,6 @@ export function debugSubject<T>(
     wrapper.querySelector('[data-action="pause"]')?.addEventListener('click', handlePause)
     wrapper.querySelector('[data-action="clear"]')?.addEventListener('click', handleClear)
     wrapper.querySelector('[data-action="copy"]')?.addEventListener('click', handleCopy)
-    wrapper.querySelector('[data-action="update"]')?.addEventListener('click', handleUpdate)
     wrapper.querySelector('[data-action="toggle-view"]')?.addEventListener('click', (e) => {
         e.stopPropagation()
         handleToggleView()
@@ -583,11 +523,6 @@ export function debugSubject<T>(
         })
     }
 
-    // Editor enter key
-    valueEditor?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleUpdate()
-    })
-
     // Time window buttons
     wrapper.querySelectorAll('.time-window-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -595,6 +530,52 @@ export function debugSubject<T>(
             const window = parseInt((btn as HTMLElement).getAttribute('data-window') || '30') as 30 | 60 | 180
             handleTimeWindowChange(window)
         })
+    })
+
+    // Canvas hover tooltip
+    historyGraphEl.addEventListener('mousemove', (e) => {
+        if (viewMode !== 'graph' || graphDataPoints.length === 0) return
+
+        const rect = historyGraphEl.getBoundingClientRect()
+        const mouseX = e.clientX - rect.left
+        const mouseY = e.clientY - rect.top
+
+        // Find closest point within threshold
+        const threshold = 10
+        let closestPoint: typeof graphDataPoints[0] | null = null
+        let minDistance = threshold
+
+        for (const point of graphDataPoints) {
+            const distance = Math.sqrt(
+                Math.pow(point.screenX - mouseX, 2) +
+                Math.pow(point.screenY - mouseY, 2)
+            )
+            if (distance < minDistance) {
+                minDistance = distance
+                closestPoint = point
+            }
+        }
+
+        if (closestPoint) {
+            // Show tooltip
+            tooltipEl.style.display = 'block'
+            tooltipEl.style.left = `${e.clientX - rect.left + 10}px`
+            tooltipEl.style.top = `${e.clientY - rect.top - 30}px`
+            tooltipEl.innerHTML = `
+                <div class="tooltip-time">${formatTime(closestPoint.entry.timestamp)}</div>
+                <div class="tooltip-value">Value: ${formatValue(closestPoint.entry.value)}</div>
+                <div class="tooltip-count">#${closestPoint.entry.count}</div>
+            `
+            historyGraphEl.style.cursor = 'pointer'
+        } else {
+            tooltipEl.style.display = 'none'
+            historyGraphEl.style.cursor = 'default'
+        }
+    })
+
+    historyGraphEl.addEventListener('mouseout', () => {
+        tooltipEl.style.display = 'none'
+        historyGraphEl.style.cursor = 'default'
     })
 
     // Subscribe to subject changes
@@ -609,7 +590,6 @@ export function debugSubject<T>(
 
     // Cleanup function
     return () => {
-        stopGraphInterval()
         subscription.unsubscribe()
         wrapper.remove()
     }
@@ -691,6 +671,12 @@ function injectStyles() {
             margin: 0;
             font-size: 18px;
             font-weight: 600;
+        }
+
+        .debug-type {
+            font-weight: 400;
+            opacity: 0.6;
+            font-size: 16px;
         }
 
         .debug-actions {
@@ -845,39 +831,6 @@ function injectStyles() {
             font-weight: 600;
         }
 
-        .editor-section {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #e1e4e8;
-        }
-
-        .dark .editor-section {
-            border-top-color: #30363d;
-        }
-
-        .editor-label {
-            display: block;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 6px;
-        }
-
-        .value-editor {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #d1d5da;
-            border-radius: 6px;
-            font-family: 'SF Mono', Monaco, monospace;
-            font-size: 12px;
-            margin-bottom: 8px;
-        }
-
-        .dark .value-editor {
-            background: #0d1117;
-            color: #c9d1d9;
-            border-color: #30363d;
-        }
-
         .history-list {
             max-height: 300px;
             overflow-y: auto;
@@ -892,6 +845,49 @@ function injectStyles() {
 
         .dark .history-graph {
             border-color: #30363d;
+        }
+
+        .graph-container {
+            position: relative;
+        }
+
+        .graph-tooltip {
+            position: absolute;
+            background: #24292e;
+            color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            white-space: nowrap;
+        }
+
+        .dark .graph-tooltip {
+            background: #c9d1d9;
+            color: #0d1117;
+            box-shadow: 0 2px 8px rgba(255, 255, 255, 0.15);
+        }
+
+        .tooltip-time {
+            font-family: 'SF Mono', Monaco, monospace;
+            opacity: 0.8;
+            font-size: 10px;
+            margin-bottom: 4px;
+        }
+
+        .tooltip-value {
+            font-weight: 600;
+            margin-bottom: 2px;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tooltip-count {
+            font-size: 10px;
+            opacity: 0.7;
         }
 
         .view-toggle {

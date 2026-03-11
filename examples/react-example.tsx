@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { Subject, DeepSubject } from 'subjecto';
+import { Subject, DeepSubject, batch } from 'subjecto';
 import { useSubject, useDeepSubject, useDeepSubjectSelector } from 'subjecto/react';
 
 // ============================================
@@ -46,15 +46,7 @@ const userSubject = new Subject<User>(
 );
 
 export function UserProfileExample() {
-  const [user, setUser] = useSubject(userSubject);
-
-  const updateName = () => {
-    userSubject.nextAssign({ name: 'Jane Doe' });
-  };
-
-  const updateAge = () => {
-    userSubject.nextAssign({ age: user.age + 1 });
-  };
+  const [user] = useSubject(userSubject);
 
   return (
     <div>
@@ -62,8 +54,12 @@ export function UserProfileExample() {
       <p>Name: {user.name}</p>
       <p>Age: {user.age}</p>
       <p>Email: {user.email}</p>
-      <button onClick={updateName}>Change Name</button>
-      <button onClick={updateAge}>Increment Age</button>
+      <button onClick={() => userSubject.nextAssign({ name: 'Jane Doe' })}>
+        Change Name
+      </button>
+      <button onClick={() => userSubject.nextAssign({ age: user.age + 1 })}>
+        Increment Age
+      </button>
     </div>
   );
 }
@@ -112,38 +108,27 @@ const appState = new DeepSubject<AppState>(
 );
 
 export function UserNameDisplay() {
-  // Subscribe only to user/name - component re-renders only when name changes
-  const userName = useDeepSubject(appState, 'user/name');
+  // Subscribe only to user/name — component re-renders only when name changes
+  const [userName, setUserName] = useDeepSubject(appState, 'user/name');
 
   return (
     <div>
       <h3>User Name Component</h3>
       <p>Name: {userName}</p>
-      <button
-        onClick={() => {
-          appState.getValue().user.name = 'Bob';
-        }}
-      >
-        Change Name
-      </button>
+      <button onClick={() => setUserName('Bob')}>Change Name</button>
     </div>
   );
 }
 
 export function ThemeDisplay() {
   // Subscribe only to settings/theme
-  const theme = useDeepSubject(appState, 'settings/theme');
+  const [theme, setTheme] = useDeepSubject(appState, 'settings/theme');
 
   return (
     <div>
       <h3>Theme Component</h3>
       <p>Current theme: {theme}</p>
-      <button
-        onClick={() => {
-          const currentTheme = appState.getValue().settings.theme;
-          appState.getValue().settings.theme = currentTheme === 'light' ? 'dark' : 'light';
-        }}
-      >
+      <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
         Toggle Theme
       </button>
     </div>
@@ -152,15 +137,14 @@ export function ThemeDisplay() {
 
 export function CartItemsDisplay() {
   // Subscribe only to cart/items
-  const items = useDeepSubject(appState, 'cart/items');
+  const [items] = useDeepSubject(appState, 'cart/items');
 
   const addItem = () => {
-    const newItem = {
+    appState.getValue().cart.items.push({
       id: Date.now(),
       name: `Product ${items.length + 1}`,
       price: Math.random() * 100,
-    };
-    appState.getValue().cart.items.push(newItem);
+    });
   };
 
   return (
@@ -168,7 +152,7 @@ export function CartItemsDisplay() {
       <h3>Cart Items Component</h3>
       <p>Items in cart: {items.length}</p>
       <ul>
-        {items.map((item) => (
+        {items.map((item: { id: number; name: string; price: number }) => (
           <li key={item.id}>
             {item.name} - ${item.price.toFixed(2)}
           </li>
@@ -185,8 +169,11 @@ export function CartItemsDisplay() {
 
 export function CartTotalDisplay() {
   // Use selector to compute derived state
-  const total = useDeepSubjectSelector(appState, 'cart/items', (items) =>
-    items.reduce((sum, item) => sum + item.price, 0)
+  const total = useDeepSubjectSelector(
+    appState,
+    'cart/items',
+    (items: Array<{ id: number; name: string; price: number }>) =>
+      items.reduce((sum: number, item) => sum + item.price, 0),
   );
 
   return (
@@ -198,9 +185,11 @@ export function CartTotalDisplay() {
 }
 
 export function UserBioDisplay() {
-  // Use selector to format the bio
-  const formattedBio = useDeepSubjectSelector(appState, 'user/profile/bio', (bio) =>
-    bio.toUpperCase()
+  // Use selector to derive a formatted string from the profile object
+  const formattedBio = useDeepSubjectSelector(
+    appState,
+    'user/profile',
+    (profile: { bio: string; location: string }) => `${profile.bio} in ${profile.location}`,
   );
 
   return (
@@ -212,7 +201,33 @@ export function UserBioDisplay() {
 }
 
 // ============================================
-// Example 5: Complete App Example
+// Example 5: Batched Updates
+// ============================================
+
+export function BatchedUpdateExample() {
+  const [userName] = useDeepSubject(appState, 'user/name');
+  const [theme] = useDeepSubject(appState, 'settings/theme');
+
+  const updateBoth = () => {
+    // Without batch: two separate notification cycles
+    // With batch: subscribers notified once after both mutations
+    batch(() => {
+      appState.getValue().user.name = 'Charlie';
+      appState.getValue().settings.theme = 'dark';
+    });
+  };
+
+  return (
+    <div>
+      <h3>Batched Update Example</h3>
+      <p>Name: {userName}, Theme: {theme}</p>
+      <button onClick={updateBoth}>Update Both (Batched)</button>
+    </div>
+  );
+}
+
+// ============================================
+// Full App
 // ============================================
 
 export function AppExample() {
@@ -228,6 +243,8 @@ export function AppExample() {
       <CartItemsDisplay />
       <CartTotalDisplay />
       <UserBioDisplay />
+      <hr />
+      <BatchedUpdateExample />
     </div>
   );
 }

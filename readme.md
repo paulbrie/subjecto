@@ -23,6 +23,7 @@ A minimalistic, zero-dependency JavaScript state management library built with T
 - [API Reference](#api-reference)
   - [Subject](#subject)
   - [DeepSubject](#deepsubject)
+  - [batch](#batch)
 - [Usage Examples](#usage-examples)
   - [Example 8: Using Built-in React Hooks](#example-8-using-built-in-react-hooks)
 - [Advanced Topics](#advanced-topics)
@@ -40,8 +41,8 @@ A minimalistic, zero-dependency JavaScript state management library built with T
 - [React Integration](#react-integration)
   - [Built-in React Hooks](#built-in-react-hooks)
   - [useSubject](#usesubjectt)
-  - [useDeepSubject](#usedeepsubjectt-p)
-  - [useDeepSubjectSelector](#usedeepsubjectselectort-p-r)
+  - [useDeepSubject](#usedeepsubjectt-p) — returns `[value, setter]`
+  - [useDeepSubjectSelector](#usedeepsubjectselectort-p-r) — derived values with custom equality
   - [Understanding useSyncExternalStore](#understanding-usesyncexternalstore-advanced)
   - [Performance Tips for React](#performance-tips-for-react)
   - [Server-Side Rendering (SSR)](#server-side-rendering-ssr)
@@ -90,14 +91,14 @@ Import only what you need to minimize bundle size:
 // Minimal - just Subject (~0.6KB gzipped)
 import { Subject } from 'subjecto/core'
 
-// Full - Subject + DeepSubject (~1.8KB gzipped)
-import { Subject, DeepSubject } from 'subjecto'
+// Full - Subject + DeepSubject + batch + helpers (~1.8KB gzipped)
+import { Subject, DeepSubject, batch, toggle, nextPush } from 'subjecto'
 
-// Tree-shakeable helpers (~0.3KB gzipped per helper)
+// Tree-shakeable helpers only (~0.3KB gzipped per helper)
 import { nextPush, toggle, once } from 'subjecto/helpers'
 
 // React hooks (~0.5KB gzipped)
-import { useSubject, useDeepSubject } from 'subjecto/react'
+import { useSubject, useDeepSubject, useDeepSubjectSelector } from 'subjecto/react'
 
 // Debug UI (~5KB gzipped, dev-only)
 import { debugSubject } from 'subjecto/debug'
@@ -333,7 +334,9 @@ subject.nextPush(4); // [1, 2, 3, 4]
 
 ##### `toggle(): void`
 
-Toggle a boolean value. Only works when the current value is a boolean.
+Toggle a boolean value.
+
+**Throws:** `Error` if the current value is not a boolean
 
 **Example:**
 
@@ -425,10 +428,6 @@ The number of times `next()` has been called (including initialization). Starts 
 ##### `options: SubjectConstructorOptions`
 
 The options passed to the constructor.
-
-##### `me: Subject<T>`
-
-Self-reference to the subject instance. This property returns the Subject itself and can be useful for method chaining or passing the subject instance as a parameter while maintaining type safety.
 
 ---
 
@@ -574,7 +573,7 @@ Subscribe to changes at a specific path or pattern. By default, the subscriber i
 **Important Notes:**
 
 - Array index subscriptions (e.g., `"cart/items/0"`) are not supported. Subscribe to the array itself (`"cart/items"`) or use wildcard patterns (`"cart/**"`) instead
-- When subscribing to nested object paths (e.g., `"user/profile"`), changes to deeper properties (e.g., `"user/profile/bio"`) will not trigger the subscription unless you use a wildcard pattern (e.g., `"user/profile/**"`)
+- Subscribing to a parent path (e.g., `"user"`) will automatically receive notifications when any descendant changes (e.g., `"user/name"`, `"user/profile/bio"`)
 
 **Example:**
 
@@ -642,6 +641,16 @@ state.subscribe("user/age", callback);
 state.unsubscribe(callback);
 ```
 
+##### `complete(): void`
+
+Unsubscribe all subscribers at once.
+
+**Example:**
+
+```typescript
+state.complete(); // Removes all subscribers
+```
+
 ##### `getValue(): T`
 
 Get the current state object. The returned object is proxied, so mutations will trigger subscriptions.
@@ -668,6 +677,39 @@ A function that transforms the value before it's set and subscribers are notifie
 ##### `count: number`
 
 The number of times `next()` has been called (including initialization). Starts at `1`.
+
+---
+
+### `batch`
+
+Batch multiple mutations into a single notification cycle. Subscribers are notified once per unique path after the batch completes.
+
+**Signature:**
+```typescript
+function batch(fn: () => void): void
+```
+
+**Example:**
+
+```typescript
+import { DeepSubject, batch } from "subjecto";
+
+const state = new DeepSubject({
+  user: { name: "Alice", age: 30 },
+});
+
+// Without batch: two notification cycles
+state.getValue().user.name = "Bob";
+state.getValue().user.age = 31;
+
+// With batch: one notification cycle
+batch(() => {
+  state.getValue().user.name = "Bob";
+  state.getValue().user.age = 31;
+});
+```
+
+Batches can be nested — notifications are flushed only when the outermost batch completes.
 
 ---
 
@@ -898,23 +940,16 @@ fetchData().then(() => {
 
 Subjecto provides first-class React integration with built-in, type-safe hooks:
 
-```typescript
-import { Subject, DeepSubject } from "subjecto";
-import {
-  useSubject,
-  useDeepSubject,
-  useDeepSubjectSelector,
-} from "subjecto/react";
+```tsx
+import { Subject, DeepSubject, batch } from "subjecto";
+import { useSubject, useDeepSubject, useDeepSubjectSelector } from "subjecto/react";
 
 // Create subjects outside components
 const counterSubject = new Subject(0);
 const appState = new DeepSubject({
   user: {
     name: "Alice",
-    profile: {
-      bio: "Software Engineer",
-      location: "San Francisco",
-    },
+    profile: { bio: "Software Engineer", location: "San Francisco" },
   },
   cart: {
     items: [] as Array<{ id: number; name: string; price: number }>,
@@ -924,108 +959,63 @@ const appState = new DeepSubject({
 // Simple counter with useSubject
 function Counter() {
   const [count, setCount] = useSubject(counterSubject);
-
   return (
     <div>
       <p>Count: {count}</p>
-      <button onClick={() => setCount(count + 1)}>Increment</button>
+      <button onClick={() => setCount(count + 1)}>+</button>
       <button onClick={() => setCount(0)}>Reset</button>
     </div>
   );
 }
 
-// Subscribe to specific nested path with useDeepSubject
+// Subscribe to a specific path — returns [value, setter]
 function UserName() {
-  // TypeScript knows this returns string
-  const name = useDeepSubject(appState, "user/name");
-
+  const [name, setName] = useDeepSubject(appState, "user/name");
   return (
     <div>
-      <h3>User: {name}</h3>
-      <button
-        onClick={() => {
-          appState.getValue().user.name = "Bob";
-        }}
-      >
-        Change Name
-      </button>
+      <p>Name: {name}</p>
+      <button onClick={() => setName("Bob")}>Change Name</button>
     </div>
   );
 }
 
-// Subscribe to nested object with useDeepSubject
+// Subscribe to a nested object
 function UserProfile() {
-  // TypeScript knows this returns { bio: string; location: string }
-  const profile = useDeepSubject(appState, "user/profile");
-
+  const [profile] = useDeepSubject(appState, "user/profile");
   return (
     <div>
-      <p>Bio: {profile.bio}</p>
-      <p>Location: {profile.location}</p>
-      <button
-        onClick={() => {
-          // Changes to nested properties trigger updates
-          appState.getValue().user.profile.bio = "Senior Engineer";
-        }}
-      >
-        Update Bio
-      </button>
+      <p>{profile.bio} in {profile.location}</p>
     </div>
   );
 }
 
-// Computed/derived values with useDeepSubjectSelector
+// Derived values with useDeepSubjectSelector
 function CartSummary() {
-  // Subscribe to cart items and compute total
-  const total = useDeepSubjectSelector(appState, "cart/items", (items) =>
-    items.reduce((sum, item) => sum + item.price, 0)
+  const total = useDeepSubjectSelector(
+    appState, "cart/items",
+    (items) => items.reduce((sum, item) => sum + item.price, 0),
   );
-
-  const itemCount = useDeepSubjectSelector(
-    appState,
-    "cart/items",
-    (items) => items.length
-  );
-
-  return (
-    <div>
-      <p>Items: {itemCount}</p>
-      <p>Total: ${total.toFixed(2)}</p>
-      <button
-        onClick={() => {
-          appState.getValue().cart.items.push({
-            id: Date.now(),
-            name: "Product",
-            price: 10,
-          });
-        }}
-      >
-        Add Item
-      </button>
-    </div>
-  );
+  return <p>Total: ${total.toFixed(2)}</p>;
 }
 
-// App component using all hooks
-function App() {
+// Batch multiple mutations into one notification cycle
+function Settings() {
+  const [name] = useDeepSubject(appState, "user/name");
   return (
     <div>
-      <Counter />
-      <UserName />
-      <UserProfile />
-      <CartSummary />
+      <p>{name}</p>
+      <button onClick={() => {
+        batch(() => {
+          appState.getValue().user.name = "Charlie";
+          appState.getValue().user.profile.bio = "CTO";
+        });
+      }}>
+        Batch Update
+      </button>
     </div>
   );
 }
 ```
-
-**Key Benefits:**
-
-- **Type Safety**: Full TypeScript inference for paths and return types
-- **Performance**: Only re-renders when subscribed data changes
-- **Automatic Cleanup**: Subscriptions are cleaned up on unmount
-- **SSR Compatible**: Works with Next.js, Remix, etc.
-- **Nested Change Detection**: Uses wildcard patterns internally to catch all nested changes
 
 ## Advanced Topics
 
@@ -1203,14 +1193,14 @@ The `useDeepSubject` hook uses these utilities to provide full type safety:
 ```typescript
 const state = new DeepSubject<AppState>({...});
 
-// TypeScript knows this returns string
-const userName = useDeepSubject(state, "user/name");
+// TypeScript knows this returns [string, setter]
+const [userName, setUserName] = useDeepSubject(state, "user/name");
 
-// TypeScript knows this returns { bio: string; location: string }
-const profile = useDeepSubject(state, "user/profile");
+// TypeScript knows this returns [{ bio: string; location: string }, setter]
+const [profile] = useDeepSubject(state, "user/profile");
 
 // TypeScript error: Invalid path!
-const invalid = useDeepSubject(state, "user/invalid");
+const [invalid] = useDeepSubject(state, "user/invalid");
 ```
 
 This ensures you can't subscribe to paths that don't exist, catching typos at compile time.
@@ -1282,11 +1272,44 @@ Subjecto is highly optimized for production use:
 - **Production builds**: Debug code automatically stripped when `process.env.NODE_ENV === 'production'`
 - **Modern target**: Compiled to ES2017 for smaller output (uses native async/await, spread, etc.)
 
-### Runtime Performance
-- **Subject**: O(n) where n is the number of subscribers. Very fast for typical use cases.
-- **DeepSubject**: Uses JavaScript Proxies with minimal overhead. Proxy caching ensures objects are only proxied once.
+### Subject vs DeepSubject Performance
+
+Both are fast for typical apps. Choose based on your data shape, not micro-benchmarks.
+
+#### Runtime speed
+
+| Scenario | Best choice | Why |
+|---|---|---|
+| High-frequency updates (60fps, real-time data) | Subject | No proxy overhead, direct notify |
+| Large state tree, infrequent mutations | DeepSubject | Same perf, less boilerplate |
+| Thousands of mutations/second | Subject | O(subscribers) with no path matching |
+| Wildcard patterns (`**`) with deep nesting | Subject | Avoids pattern matching cost |
+| Many subscribers on the same value | Equal | Both iterate their subscriber collections |
+
+- **Subject**: `next()` iterates a flat `Map<symbol, callback>`. O(n) where n = subscribers.
+- **DeepSubject**: Each property set goes through a Proxy trap, then walks subscriber patterns (exact match, ancestors, wildcards). Path matching is LRU-cached (100 entries), but more work per mutation than Subject.
+
+#### Memory footprint
+
+| | 10 Subjects | 1 DeepSubject (50 nested objects) |
+|---|---|---|
+| Core objects | 10 Subject instances | 1 DeepSubject instance |
+| Proxies | 0 | ~50 (one per nested object/array) |
+| Subscriber storage | 10 `Map`s | 1 `Map<path, Set>` |
+| Proxy cache | none | ~50 `WeakMap` entries (auto GC'd) |
+| Path match cache | none | Up to 100 entries (shared, module-level) |
+
+Proxies are thin wrappers around original objects, not deep copies. The `WeakMap` cache means proxies are garbage-collected when the underlying object is released.
+
+**Where memory matters:**
+- Very large arrays (10,000+ items) — each accessed element gets a cached proxy
+- Very deep nesting (20+ levels) — proxy chain per property access
+- Many DeepSubject instances — each has its own proxy cache
+
+For a typical app state (dozens of nested objects, a few arrays), the difference is a few KB.
+
+### Other Runtime Details
 - **Wildcard Matching**: Optimized with LRU cache for pattern matching. Fast paths for exact matches and simple wildcards.
-- **Memory**: WeakMap usage ensures efficient memory management. No memory leaks from circular references.
 - **Error Handling**: Subscriber errors are caught and don't break other subscriptions (only logged in development).
 
 ### Optimization Tips
@@ -1294,45 +1317,48 @@ Subjecto is highly optimized for production use:
 For most applications, performance is excellent out of the box. For demanding use cases with thousands of subscribers or very deep object structures, consider:
 
 - Using more specific path subscriptions instead of wildcards (e.g., `"user/name"` instead of `"user/**"`)
-- Batching updates when possible
+- Using `batch()` to coalesce multiple mutations into a single notification cycle
 - Using `updateIfStrictlyEqual: false` to skip notifications when values haven't changed
 - Using `subjecto/core` with tree-shakeable helpers for minimal bundle size
 - Importing React hooks from `subjecto/react` separately to avoid bundling them in non-React code
 
 ## Migration Guide
 
-### From v0.0.60 to v0.0.61+ (Optimization Release)
+### From v0.0.61 to v0.0.62+ (React API improvements)
 
-**No breaking changes!** This release focuses on bundle size optimization and performance improvements:
+**Breaking change:** `useDeepSubject` now returns a `[value, setter]` tuple instead of the value directly.
 
-**New Features:**
-- **Tree-shakeable helpers**: Import helpers separately for smaller bundles
+```typescript
+// Before
+const name = useDeepSubject(state, "user/name");
+
+// After
+const [name, setName] = useDeepSubject(state, "user/name");
+setName("Bob"); // new setter — no need for getValue()
+```
+
+**New features:**
+- **`batch()`**: Coalesce multiple mutations into one notification cycle
   ```typescript
-  // New - tree-shakeable (0.3KB gzipped per helper)
-  import { Subject } from 'subjecto/core'
-  import { nextPush, toggle } from 'subjecto/helpers'
-
-  // Old - still works (1.8KB gzipped)
-  import { Subject } from 'subjecto'
-  subject.nextPush(1)
+  import { batch } from "subjecto";
+  batch(() => {
+    state.getValue().user.name = "Bob";
+    state.getValue().user.age = 31;
+  }); // subscribers notified once
   ```
+- **Parent-path notifications**: Subscribing to `"user"` now receives notifications when `"user/name"` changes
+- **`useDeepSubjectSelector` accepts `isEqual`**: Custom equality for selector results (defaults to shallow equality instead of `JSON.stringify`)
 
-- **Minimal core bundle**: Use `subjecto/core` for just Subject (0.6KB gzipped)
-  ```typescript
-  // New - minimal
-  import { Subject } from 'subjecto/core'
+---
 
-  // Old - still works but includes DeepSubject
-  import { Subject } from 'subjecto'
-  ```
+### From v0.0.60 to v0.0.61 (Optimization Release)
 
-**Improvements:**
+**No breaking changes.** Bundle size optimization and performance improvements:
+
+- **Tree-shakeable helpers**: `import { nextPush, toggle } from 'subjecto/helpers'`
+- **Minimal core bundle**: `import { Subject } from 'subjecto/core'` (0.6KB gzipped)
 - **89% smaller**: Full bundle reduced from ~16KB to 1.8KB gzipped
 - **Production optimizations**: Debug code automatically stripped in production builds
-- **Faster path matching**: LRU cache and optimized algorithms for DeepSubject
-- **Better tree-shaking**: ES2017 target reduces polyfill overhead
-
-**Migration:** No code changes required! All existing code continues to work. To optimize bundle size, consider using the new modular imports.
 
 ---
 
@@ -1413,110 +1439,94 @@ function Counter() {
 
 ### `useDeepSubject<T, P>`
 
-Subscribe to a specific path in a `DeepSubject` with full type safety and automatic nested change detection.
+Subscribe to a specific path in a `DeepSubject` with full type safety. Returns a `[value, setter]` tuple like `useState`.
 
 **Signature:**
 ```typescript
 function useDeepSubject<T extends object, P extends Paths<T>>(
   subject: DeepSubject<T>,
   path: P
-): PathValue<T, P>
+): [PathValue<T, P>, (value: PathValue<T, P>) => void]
 ```
 
 **Example:**
 
-```typescript
+```tsx
 import { DeepSubject } from "subjecto";
 import { useDeepSubject } from "subjecto/react";
 
 const appState = new DeepSubject({
   user: {
     name: "Alice",
-    profile: { bio: "Engineer", location: "SF" }
-  }
+    profile: { bio: "Engineer", location: "SF" },
+  },
 });
 
 function UserName() {
-  // TypeScript infers return type as string
-  const name = useDeepSubject(appState, "user/name");
-
+  const [name, setName] = useDeepSubject(appState, "user/name");
   return (
     <div>
       <p>Name: {name}</p>
-      <button onClick={() => {
-        appState.getValue().user.name = "Bob";
-      }}>
-        Change Name
-      </button>
+      <button onClick={() => setName("Bob")}>Change Name</button>
     </div>
   );
 }
 
 function UserProfile() {
-  // TypeScript infers return type as { bio: string; location: string }
-  const profile = useDeepSubject(appState, "user/profile");
-
+  // TypeScript infers [{ bio: string; location: string }, setter]
+  const [profile] = useDeepSubject(appState, "user/profile");
   return (
     <div>
       <p>Bio: {profile.bio}</p>
       <p>Location: {profile.location}</p>
-      <button onClick={() => {
-        // Nested property changes are automatically detected!
-        appState.getValue().user.profile.bio = "Senior Engineer";
-      }}>
-        Update Bio
-      </button>
     </div>
   );
 }
 ```
 
 **Features:**
-- **Type-safe paths**: TypeScript validates paths at compile time
-- **Nested change detection**: Uses wildcard subscriptions internally (`path/**`) to detect all nested property changes
-- **Automatic cleanup**: Unsubscribes on unmount
-- **Type inference**: Return type is automatically inferred from the path
+- Returns `[value, setter]` tuple like `useState`
+- Type-safe paths validated at compile time
+- Nested change detection (mutating `user/profile/bio` re-renders a `user/profile` subscriber)
+- Automatic cleanup on unmount
 
 ---
 
 ### `useDeepSubjectSelector<T, P, R>`
 
-Subscribe to a path and compute a derived value with a selector function. Useful for complex calculations or data transformations.
+Subscribe to a path and compute a derived value with a selector function. Only re-renders when the selector result changes.
 
 **Signature:**
 ```typescript
 function useDeepSubjectSelector<T extends object, P extends Paths<T>, R>(
   subject: DeepSubject<T>,
   path: P,
-  selector: (value: PathValue<T, P>) => R
+  selector: (value: PathValue<T, P>) => R,
+  isEqual?: (a: R, b: R) => boolean  // defaults to shallow equality
 ): R
 ```
 
 **Example:**
 
-```typescript
+```tsx
 import { DeepSubject } from "subjecto";
 import { useDeepSubjectSelector } from "subjecto/react";
 
 const appState = new DeepSubject({
   cart: {
-    items: [] as Array<{ id: number; name: string; price: number }>
-  }
+    items: [] as Array<{ id: number; name: string; price: number }>,
+  },
 });
 
 function CartSummary() {
-  // Compute total price
   const total = useDeepSubjectSelector(
-    appState,
-    "cart/items",
-    (items) => items.reduce((sum, item) => sum + item.price, 0)
+    appState, "cart/items",
+    (items) => items.reduce((sum, item) => sum + item.price, 0),
   );
 
-  // Compute item count
   const count = useDeepSubjectSelector(
-    appState,
-    "cart/items",
-    (items) => items.length
+    appState, "cart/items",
+    (items) => items.length,
   );
 
   return (
@@ -1529,9 +1539,10 @@ function CartSummary() {
 ```
 
 **Features:**
-- **Memoized selectors**: Only recomputes when the input value changes
-- **Object comparison**: Uses JSON.stringify for object/array results to detect deep changes
-- **Type inference**: Result type is inferred from selector return type
+- Memoized: only recomputes when the input value changes
+- Defaults to **shallow equality** for comparing selector results (handles objects/arrays correctly)
+- Accepts an optional `isEqual` function for custom comparison logic
+- Result type is inferred from the selector return type
 
 ---
 
@@ -1580,11 +1591,8 @@ function useCustomSubject<T>(subject: Subject<T>): T {
 
 2. **Use specific paths with DeepSubject**
    ```typescript
-   // ✅ Good - specific path
-   const name = useDeepSubject(state, "user/name");
-
-   // ❌ Less efficient - subscribes to everything
-   const everything = useDeepSubject(state, "**");
+   // ✅ Good - specific path, only re-renders when name changes
+   const [name] = useDeepSubject(state, "user/name");
    ```
 
 3. **Use selectors for derived values**
@@ -1596,9 +1604,22 @@ function useCustomSubject<T>(subject: Subject<T>): T {
 
    // ❌ Bad - recomputes on every render
    function Component() {
-     const items = useDeepSubject(state, "cart/items");
+     const [items] = useDeepSubject(state, "cart/items");
      const total = items.reduce((sum, i) => sum + i.price, 0);
    }
+   ```
+
+4. **Batch multiple mutations**
+   ```typescript
+   // ✅ Good - subscribers notified once
+   batch(() => {
+     state.getValue().user.name = "Alice";
+     state.getValue().user.profile.bio = "CTO";
+   });
+
+   // ❌ Less efficient - two notification cycles
+   state.getValue().user.name = "Alice";
+   state.getValue().user.profile.bio = "CTO";
    ```
 
 ---
@@ -1634,15 +1655,15 @@ For a comprehensive example using all three hooks (`useSubject`, `useDeepSubject
 
 **Issue: Component not re-rendering when state changes**
 
-Solution: Ensure you're calling `getValue()` on the subject to get the proxied object (for DeepSubject):
+Solution: Ensure you're mutating via the proxied object from `getValue()`:
 
 ```typescript
-// ✅ Correct
+// ✅ Correct - mutate through the proxy
 appState.getValue().user.name = "New Name";
 
-// ❌ Won't trigger subscriptions
-const state = appState.getValue();
-state.user = { name: "New Name" }; // Replaces entire user object
+// ✅ Also correct - use the setter from useDeepSubject
+const [name, setName] = useDeepSubject(state, "user/name");
+setName("New Name");
 ```
 
 **Issue: TypeScript errors with path subscriptions**
@@ -1651,30 +1672,30 @@ Solution: Make sure your state interface matches your actual data structure:
 
 ```typescript
 interface AppState {
-  user: {
-    name: string;
-  };
+  user: { name: string };
 }
 
 const state = new DeepSubject<AppState>({...});
 
 // ✅ TypeScript validates this path
-const name = useDeepSubject(state, "user/name");
+const [name] = useDeepSubject(state, "user/name");
 
 // ❌ TypeScript error - path doesn't exist
-const invalid = useDeepSubject(state, "user/invalid");
+const [invalid] = useDeepSubject(state, "user/invalid");
 ```
 
-**Issue: Nested property changes not detected**
+**Issue: Too many notification cycles**
 
-The built-in hooks automatically handle this by using wildcard subscriptions internally. If you're implementing custom hooks, use the `path/**` pattern:
+Solution: Use `batch()` to coalesce multiple mutations:
 
 ```typescript
-// ✅ Detects nested changes
-const handle = subject.subscribe("user/profile/**", callback);
+import { batch } from "subjecto";
 
-// ❌ Won't detect changes to user.profile.bio
-const handle = subject.subscribe("user/profile", callback);
+// ✅ Subscribers notified once after both mutations
+batch(() => {
+  appState.getValue().user.name = "Jane";
+  appState.getValue().user.age = 25;
+});
 ```
 
 **Issue: Memory leaks**

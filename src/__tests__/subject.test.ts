@@ -114,11 +114,9 @@ describe('assigning values', () => {
         expect(subject.getValue() === true)
     })
 
-    test('toggle does nothing when value is not boolean', () => {
+    test('toggle throws when value is not boolean', () => {
         const subject = new Subject('not a boolean')
-        const initialValue = subject.getValue()
-        subject.toggle()
-        expect(subject.getValue()).toBe(initialValue)
+        expect(() => subject.toggle()).toThrow('Subject value must be a boolean')
     })
 
     test('before', () => {

@@ -1,16 +1,16 @@
-import { useSyncExternalStore, useRef } from 'react';
+import { useSyncExternalStore, useRef, useCallback } from 'react';
 import { DeepSubject } from '../deepSubject';
 import type { Paths, PathValue } from './types';
 
 /**
- * Helper function to get value at path
- * Returns primitive values directly, or a stable reference for objects/arrays
+ * Helper function to get value at path.
+ * Traverses through the proxy so nested objects return stable cached proxies.
  */
 function getValueAtPath<T extends object>(subject: DeepSubject<T>, path: string): unknown {
     const parts = path.split('/');
     let value: unknown = subject.getValue();
     for (const part of parts) {
-        if (value && typeof value === 'object' && !Array.isArray(value) && part in value) {
+        if (value && typeof value === 'object' && part in (value as Record<string, unknown>)) {
             value = (value as Record<string, unknown>)[part];
         } else {
             return undefined;
@@ -20,14 +20,61 @@ function getValueAtPath<T extends object>(subject: DeepSubject<T>, path: string)
 }
 
 /**
- * Custom hook for using DeepSubject in React components with type-safe paths
+ * Helper function to set value at path via proxy (triggers notifications).
+ */
+function setValueAtPath<T extends object>(subject: DeepSubject<T>, path: string, newValue: unknown): void {
+    const parts = path.split('/');
+    let current: unknown = subject.getValue();
+    for (let i = 0; i < parts.length - 1; i++) {
+        if (current && typeof current === 'object') {
+            current = (current as Record<string, unknown>)[parts[i]];
+        } else {
+            return;
+        }
+    }
+    if (current && typeof current === 'object') {
+        (current as Record<string, unknown>)[parts[parts.length - 1]] = newValue;
+    }
+}
+
+/**
+ * Default shallow equality check for selector results.
+ */
+function shallowEqual<R>(a: R, b: R): boolean {
+    if (Object.is(a, b)) return true;
+    if (
+        typeof a !== 'object' || a === null ||
+        typeof b !== 'object' || b === null
+    ) {
+        return false;
+    }
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    for (const key of keysA) {
+        if (
+            !Object.prototype.hasOwnProperty.call(b, key) ||
+            !Object.is((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Custom hook for using DeepSubject in React components with type-safe paths.
+ *
+ * Uses a version counter internally so mutable proxy references still trigger
+ * re-renders via useSyncExternalStore.
+ *
  * @param subject - The DeepSubject instance to subscribe to
  * @param path - The path to subscribe to (e.g., "user/name" or "cart/items")
- * @returns The current value at the specified path with correct typing
- * 
+ * @returns A tuple containing the current value and a setter function
+ *
  * @example
- * const userName = useDeepSubject(appState, "user/name"); // TypeScript knows this is string
- * const cartItems = useDeepSubject(appState, "cart/items"); // TypeScript knows this is Array<...>
+ * const [userName, setUserName] = useDeepSubject(appState, "user/name");
+ * const [cartItems] = useDeepSubject(appState, "cart/items");
  */
 export function useDeepSubject<
     T extends object,
@@ -35,28 +82,42 @@ export function useDeepSubject<
 >(
     subject: DeepSubject<T>,
     path: P
-): PathValue<T, P> {
-    const getSnapshot = () => getValueAtPath(subject, path);
+): [PathValue<T, P>, (value: PathValue<T, P>) => void] {
+    const storeRef = useRef({ value: getValueAtPath(subject, path), version: 0 });
 
-    return useSyncExternalStore(
-        (onStoreChange) => {
-            // Use skipInitialCall option to prevent DeepSubject from calling the callback immediately
-            // React's useSyncExternalStore will get the initial value via getSnapshot instead
-            // Subscribe with /** wildcard to catch nested property changes
-            const subscribePath = `${path}/**`;
-            const handle = subject.subscribe(subscribePath, onStoreChange, { skipInitialCall: true });
-            return () => handle.unsubscribe();
-        },
-        getSnapshot,
-        getSnapshot // Server snapshot
-    ) as PathValue<T, P>;
+    // Stable subscribe function - only changes when subject or path changes
+    // path/** matches both the exact path and all descendants (** matches zero segments)
+    const subscribe = useCallback((onStoreChange: () => void) => {
+        const handle = subject.subscribe(`${path}/**`, () => {
+            storeRef.current = {
+                value: getValueAtPath(subject, path),
+                version: storeRef.current.version + 1,
+            };
+            onStoreChange();
+        }, { skipInitialCall: true });
+
+        return () => handle.unsubscribe();
+    }, [subject, path]);
+
+    const getSnapshot = useCallback(() => storeRef.current, []);
+
+    const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+
+    const setter = useCallback(
+        (newValue: PathValue<T, P>) => setValueAtPath(subject, path as string, newValue),
+        [subject, path],
+    );
+
+    return [snapshot.value as PathValue<T, P>, setter];
 }
 
 /**
- * Custom hook for using DeepSubject with type safety and custom selector
+ * Custom hook for using DeepSubject with type safety and custom selector.
+ *
  * @param subject - The DeepSubject instance to subscribe to
  * @param path - The path to subscribe to (type-safe)
  * @param selector - Function to extract/transform the value from the state
+ * @param isEqual - Optional equality function (defaults to shallow equality)
  * @returns The selected value
  */
 export function useDeepSubjectSelector<
@@ -66,75 +127,41 @@ export function useDeepSubjectSelector<
 >(
     subject: DeepSubject<T>,
     path: P,
-    selector: (value: PathValue<T, P>) => R
+    selector: (value: PathValue<T, P>) => R,
+    isEqual: (a: R, b: R) => boolean = shallowEqual,
 ): R {
-    // Cache to prevent infinite loops when selector returns new object/array references
-    const lastValueRef = useRef<unknown>(undefined);
-    const lastResultRef = useRef<R | undefined>(undefined);
-    const lastResultStringRef = useRef<string | undefined>(undefined);
+    // Use refs for selector and isEqual so subscribe closure stays stable
+    const selectorRef = useRef(selector);
+    selectorRef.current = selector;
+    const isEqualRef = useRef(isEqual);
+    isEqualRef.current = isEqual;
 
-    const getSnapshot = () => {
-        const value = getValueAtPath(subject, path);
-        
-        // Only recompute if the input value reference changed
-        if (value !== lastValueRef.current) {
-            lastValueRef.current = value;
-            const newResult = selector(value as PathValue<T, P>);
-            
-            // For objects/arrays, compare serialized versions to detect actual changes
-            if (typeof newResult === 'object' && newResult !== null) {
-                const newResultString = JSON.stringify(newResult);
-                if (newResultString !== lastResultStringRef.current) {
-                    lastResultStringRef.current = newResultString;
-                    lastResultRef.current = newResult;
-                }
-            } else {
-                // For primitives, use direct comparison
-                lastResultRef.current = newResult;
+    const storeRef = useRef<{ result: R; version: number }>({
+        result: selector(getValueAtPath(subject, path) as PathValue<T, P>),
+        version: 0,
+    });
+
+    const subscribe = useCallback((onStoreChange: () => void) => {
+        const onChange = () => {
+            const value = getValueAtPath(subject, path);
+            const newResult = selectorRef.current(value as PathValue<T, P>);
+
+            if (!isEqualRef.current(storeRef.current.result, newResult)) {
+                storeRef.current = {
+                    result: newResult,
+                    version: storeRef.current.version + 1,
+                };
+                onStoreChange();
             }
-        }
-        
-        return lastResultRef.current!;
-    };
+        };
 
-    return useSyncExternalStore(
-        (onStoreChange) => {
-            // Use skipInitialCall option to prevent DeepSubject from calling the callback immediately
-            // React's useSyncExternalStore will get the initial value via getSnapshot instead
-            // Subscribe with /** wildcard to catch nested property changes
-            const subscribePath = `${path}/**`;
-            const handle = subject.subscribe(subscribePath, () => {
-                // When notified of a change, always recalculate the selector
-                // The callback is only called when the value actually changed
-                const value = getValueAtPath(subject, path);
-                const newResult = selector(value as PathValue<T, P>);
+        const handle = subject.subscribe(`${path}/**`, onChange, { skipInitialCall: true });
 
-                // Always update value ref since we were notified
-                lastValueRef.current = value;
+        return () => handle.unsubscribe();
+    }, [subject, path]);
 
-                // Compare result and notify if changed
-                // For objects/arrays, compare serialized versions to detect actual content changes
-                if (typeof newResult === 'object' && newResult !== null) {
-                    const newResultString = JSON.stringify(newResult);
-                    // Always update cache and notify if serialized result changed
-                    // This handles cases where object reference is same but content changed
-                    if (newResultString !== lastResultStringRef.current) {
-                        lastResultStringRef.current = newResultString;
-                        lastResultRef.current = newResult;
-                        onStoreChange();
-                    }
-                } else {
-                    // For primitives, compare directly
-                    if (newResult !== lastResultRef.current) {
-                        lastResultRef.current = newResult;
-                        onStoreChange();
-                    }
-                }
-            }, { skipInitialCall: true });
-            return () => handle.unsubscribe();
-        },
-        getSnapshot,
-        getSnapshot // Server snapshot
-    ) as R;
+    const getSnapshot = useCallback(() => storeRef.current, []);
+
+    const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+    return snapshot.result;
 }
-

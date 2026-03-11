@@ -17,6 +17,7 @@ export const DEFAULT_UPDATE_IF_STRICTLY_EQUAL = true
 export const ERROR_MESSAGES = {
     VALUE_NOT_OBJECT: 'Subject value must be an object',
     VALUE_NOT_ARRAY: 'Subject value must be an array',
+    VALUE_NOT_BOOLEAN: 'Subject value must be a boolean',
 }
 
 export const INFO_MESSAGES = {
@@ -47,10 +48,7 @@ export class Subject<T> {
      * Subject options
      */
     options: SubjectConstructorOptions
-    me: Subject<T>
-
     constructor(initialValue: T, options?: SubjectConstructorOptions) {
-        this.me = this
         this.options = {
             name: options?.name ?? DEFAULT_NAME,
             updateIfStrictlyEqual: options?.updateIfStrictlyEqual ?? DEFAULT_UPDATE_IF_STRICTLY_EQUAL,
@@ -86,9 +84,10 @@ export class Subject<T> {
      * Toggles a boolean value.
      */
     toggle() {
-        if (typeof this.value === 'boolean') {
-            this.me.next(!this.value as unknown as T)
+        if (typeof this.value !== 'boolean') {
+            throw new Error(ERROR_MESSAGES.VALUE_NOT_BOOLEAN)
         }
+        this.next(!this.value as unknown as T)
     }
 
     /**
@@ -117,7 +116,7 @@ export class Subject<T> {
      */
     complete() {
         Array.from(this.subscribers.keys()).forEach((id) => {
-            this.me.unsubscribe(id)
+            this.unsubscribe(id)
         })
     }
 

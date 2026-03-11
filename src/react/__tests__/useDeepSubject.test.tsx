@@ -51,7 +51,8 @@ describe("useDeepSubject", () => {
     const subject = new DeepSubject(state);
     const { result } = renderHook(() => useDeepSubject(subject, "user"));
 
-    expect(result.current).toEqual(state.user);
+    const [value] = result.current;
+    expect(value).toEqual(state.user);
   });
 
   test("returns initial value at nested path", () => {
@@ -59,7 +60,8 @@ describe("useDeepSubject", () => {
     const subject = new DeepSubject(state);
     const { result } = renderHook(() => useDeepSubject(subject, "user/name"));
 
-    expect(result.current).toBe("John");
+    const [value] = result.current;
+    expect(value).toBe("John");
   });
 
   test("returns initial value at deeply nested path", () => {
@@ -69,7 +71,8 @@ describe("useDeepSubject", () => {
       useDeepSubject(subject, "user/profile/bio")
     );
 
-    expect(result.current).toBe("Developer");
+    const [value] = result.current;
+    expect(value).toBe("Developer");
   });
 
   test("updates when value at path changes", () => {
@@ -77,13 +80,13 @@ describe("useDeepSubject", () => {
     const subject = new DeepSubject(state);
     const { result } = renderHook(() => useDeepSubject(subject, "user/name"));
 
-    expect(result.current).toBe("John");
+    expect(result.current[0]).toBe("John");
 
     act(() => {
       subject.getValue().user.name = "Jane";
     });
 
-    expect(result.current).toBe("Jane");
+    expect(result.current[0]).toBe("Jane");
   });
 
   test("updates when nested object changes", () => {
@@ -93,13 +96,13 @@ describe("useDeepSubject", () => {
       useDeepSubject(subject, "user/profile")
     );
 
-    expect(result.current.bio).toBe("Developer");
+    expect(result.current[0].bio).toBe("Developer");
 
     act(() => {
       subject.getValue().user.profile.bio = "Senior Developer";
     });
 
-    expect(result.current.bio).toBe("Senior Developer");
+    expect(result.current[0].bio).toBe("Senior Developer");
   });
 
   test("updates when array at path changes", () => {
@@ -107,14 +110,14 @@ describe("useDeepSubject", () => {
     const subject = new DeepSubject(state);
     const { result } = renderHook(() => useDeepSubject(subject, "cart/items"));
 
-    expect(result.current).toEqual([]);
+    expect(result.current[0]).toEqual([]);
 
     act(() => {
       subject.getValue().cart.items.push({ id: 1, name: "Product", price: 10 });
     });
 
-    expect(result.current).toHaveLength(1);
-    expect(result.current[0]).toEqual({ id: 1, name: "Product", price: 10 });
+    expect(result.current[0]).toHaveLength(1);
+    expect(result.current[0][0]).toEqual({ id: 1, name: "Product", price: 10 });
   });
 
   test("multiple hooks subscribe to different paths independently", () => {
@@ -130,18 +133,18 @@ describe("useDeepSubject", () => {
       useDeepSubject(subject, "settings/theme")
     );
 
-    expect(nameResult.current).toBe("John");
-    expect(ageResult.current).toBe(30);
-    expect(themeResult.current).toBe("light");
+    expect(nameResult.current[0]).toBe("John");
+    expect(ageResult.current[0]).toBe(30);
+    expect(themeResult.current[0]).toBe("light");
 
     act(() => {
       subject.getValue().user.name = "Jane";
       subject.getValue().user.age = 31;
     });
 
-    expect(nameResult.current).toBe("Jane");
-    expect(ageResult.current).toBe(31);
-    expect(themeResult.current).toBe("light"); // Should not change
+    expect(nameResult.current[0]).toBe("Jane");
+    expect(ageResult.current[0]).toBe(31);
+    expect(themeResult.current[0]).toBe("light"); // Should not change
   });
 
   test("unsubscribes when component unmounts", () => {
@@ -169,14 +172,14 @@ describe("useDeepSubject", () => {
     const { result } = renderHook(() => useDeepSubject(subject, "user/name"));
 
     // Track renders by checking result updates
-    const initialValue = result.current;
+    const initialValue = result.current[0];
 
     act(() => {
       subject.getValue().settings.theme = "dark";
     });
 
     // Value should not change
-    expect(result.current).toBe(initialValue);
+    expect(result.current[0]).toBe(initialValue);
   });
 
   test("handles boolean values", () => {
@@ -186,13 +189,13 @@ describe("useDeepSubject", () => {
       useDeepSubject(subject, "settings/notifications")
     );
 
-    expect(result.current).toBe(true);
+    expect(result.current[0]).toBe(true);
 
     act(() => {
       subject.getValue().settings.notifications = false;
     });
 
-    expect(result.current).toBe(false);
+    expect(result.current[0]).toBe(false);
   });
 
   test("handles number values", () => {
@@ -200,13 +203,28 @@ describe("useDeepSubject", () => {
     const subject = new DeepSubject(state);
     const { result } = renderHook(() => useDeepSubject(subject, "user/age"));
 
-    expect(result.current).toBe(30);
+    expect(result.current[0]).toBe(30);
 
     act(() => {
       subject.getValue().user.age = 31;
     });
 
-    expect(result.current).toBe(31);
+    expect(result.current[0]).toBe(31);
+  });
+
+  test("setter updates the value at path", () => {
+    const state = createTestState();
+    const subject = new DeepSubject(state);
+    const { result } = renderHook(() => useDeepSubject(subject, "user/name"));
+
+    expect(result.current[0]).toBe("John");
+
+    act(() => {
+      result.current[1]("Jane");
+    });
+
+    expect(result.current[0]).toBe("Jane");
+    expect(subject.getValue().user.name).toBe("Jane");
   });
 });
 
@@ -353,13 +371,10 @@ describe("useDeepSubjectSelector", () => {
 
     expect(result.current.fullBio).toBe("Developer in NYC");
 
-    // Change bio - this modifies the nested property
-    // The callback will be called and should detect the serialized result changed
     act(() => {
       subject.getValue().user.profile.bio = "Senior Developer";
     });
 
-    // Wait for the update to propagate
     expect(result.current.fullBio).toBe("Senior Developer in NYC");
   });
 
@@ -371,7 +386,7 @@ describe("useDeepSubjectSelector", () => {
       useDeepSubject(subject, "nonexistent/path")
     );
 
-    expect(result.current).toBeUndefined();
+    expect(result.current[0]).toBeUndefined();
   });
 
   test("handles invalid path with array access", () => {
@@ -382,7 +397,7 @@ describe("useDeepSubjectSelector", () => {
       useDeepSubject(subject, "user/invalid/property")
     );
 
-    expect(result.current).toBeUndefined();
+    expect(result.current[0]).toBeUndefined();
   });
 
   test("selector with object result updates when content changes", () => {
@@ -396,22 +411,17 @@ describe("useDeepSubjectSelector", () => {
 
     expect(result.current.summary).toBe("Developer - NYC");
 
-    // Change bio - this modifies the nested property
-    // The callback will be called and should detect the serialized result changed
     act(() => {
       subject.getValue().user.profile.bio = "Senior Developer";
     });
 
-    // Wait for the update to propagate
     expect(result.current.summary).toBe("Senior Developer - NYC");
   });
 
-  test("selector callback branch when object result changes (covers lines 112-116)", () => {
+  test("selector callback branch when object result changes", () => {
     const state = createTestState();
     const subject = new DeepSubject(state);
 
-    // Use a selector that returns an object based on cart items
-    // This way when we modify the array, the callback will be called
     const { result } = renderHook(() =>
       useDeepSubjectSelector(subject, "cart/items", (items) => ({
         count: items.length,
@@ -422,16 +432,38 @@ describe("useDeepSubjectSelector", () => {
     expect(result.current.count).toBe(0);
     expect(result.current.total).toBe(0);
 
-    // Add an item - this will trigger the subscription callback
-    // The callback should detect that the serialized result changed and call onStoreChange
     act(() => {
       subject.getValue().cart.items.push({ id: 1, name: "Product", price: 10 });
     });
 
-    // This should trigger the branch at lines 112-116 where object result changes
-    // The callback will compare serialized versions and call onStoreChange()
     expect(result.current.count).toBe(1);
     expect(result.current.total).toBe(10);
+  });
+
+  test("accepts custom isEqual function", () => {
+    const state = createTestState();
+    const subject = new DeepSubject(state);
+
+    // Custom isEqual that only compares the 'count' field
+    const isEqual = (a: { count: number; label: string }, b: { count: number; label: string }) =>
+      a.count === b.count;
+
+    const { result } = renderHook(() =>
+      useDeepSubjectSelector(
+        subject,
+        "cart/items",
+        (items) => ({ count: items.length, label: `${items.length} items` }),
+        isEqual,
+      )
+    );
+
+    expect(result.current.count).toBe(0);
+
+    act(() => {
+      subject.getValue().cart.items.push({ id: 1, name: "Product", price: 10 });
+    });
+
+    expect(result.current.count).toBe(1);
   });
 
   test("can be imported from index", () => {
@@ -440,7 +472,7 @@ describe("useDeepSubjectSelector", () => {
     const { result } = renderHook(() =>
       useDeepSubjectFromIndex(subject, "user/name")
     );
-    expect(result.current).toBe("John");
+    expect(result.current[0]).toBe("John");
   });
 
   test("useDeepSubjectSelector can be imported from index", () => {
@@ -454,5 +486,143 @@ describe("useDeepSubjectSelector", () => {
       )
     );
     expect(result.current).toBe(60);
+  });
+
+  test("handles changing subject instance between renders", () => {
+    const state1 = createTestState();
+    const subject1 = new DeepSubject(state1);
+    const state2 = createTestState();
+    state2.user.name = "Alice";
+    const subject2 = new DeepSubject(state2);
+
+    const { result, rerender } = renderHook(
+      ({ subject }) => useDeepSubject(subject, "user/name"),
+      { initialProps: { subject: subject1 as DeepSubject<TestState> } }
+    );
+
+    expect(result.current[0]).toBe("John");
+
+    rerender({ subject: subject2 });
+
+    // After rerender with new subject, updating subject2 should trigger update
+    act(() => {
+      subject2.getValue().user.name = "Bob";
+    });
+    expect(result.current[0]).toBe("Bob");
+  });
+
+  test("handles changing path between renders", () => {
+    const state = createTestState();
+    const subject = new DeepSubject(state);
+
+    const { result, rerender } = renderHook(
+      ({ path }: { path: string }) =>
+        useDeepSubject(subject, path as "user/name"),
+      { initialProps: { path: "user/name" } }
+    );
+
+    expect(result.current[0]).toBe("John");
+
+    rerender({ path: "user/profile/bio" });
+
+    // After rerender with new path, updating the new path should trigger update
+    act(() => {
+      subject.getValue().user.profile.bio = "Senior Developer";
+    });
+    expect(result.current[0]).toBe("Senior Developer");
+  });
+
+  test("selector throwing error does not break the hook", () => {
+    const state = createTestState();
+    const subject = new DeepSubject(state);
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    let shouldThrow = false;
+
+    const selector = (name: string) => {
+      if (shouldThrow) throw new Error("selector error");
+      return name.toUpperCase();
+    };
+
+    const { result } = renderHook(() =>
+      useDeepSubjectSelector(subject, "user/name", selector)
+    );
+
+    expect(result.current).toBe("JOHN");
+
+    shouldThrow = true;
+    // Mutation triggers selector which throws - the hook should keep the previous value
+    act(() => {
+      subject.getValue().user.name = "Jane";
+    });
+
+    // Value should remain the previous result since selector threw
+    expect(result.current).toBe("JOHN");
+    consoleErrorSpy.mockRestore();
+  });
+
+  test("setter is a no-op when path traversal hits non-object", () => {
+    const subject = new DeepSubject({
+      user: { name: "John", age: 30 },
+    });
+    const { result } = renderHook(() =>
+      // @ts-expect-error - Testing invalid deep path through primitive
+      useDeepSubject(subject, "user/name/deep/invalid")
+    );
+
+    // Calling the setter should not throw even though the path is invalid
+    act(() => {
+      result.current[1]("anything" as never);
+    });
+
+    // The underlying value should not have changed
+    expect(subject.getValue().user.name).toBe("John");
+  });
+
+  test("selector re-renders when result has different number of keys", () => {
+    const state = createTestState();
+    const subject = new DeepSubject(state);
+
+    const { result } = renderHook(() =>
+      useDeepSubjectSelector(subject, "user/profile", (profile) => {
+        if (profile.bio === "Developer") {
+          return { bio: profile.bio };
+        }
+        return { bio: profile.bio, location: profile.location };
+      })
+    );
+
+    expect(result.current).toEqual({ bio: "Developer" });
+
+    act(() => {
+      subject.getValue().user.profile.bio = "Engineer";
+    });
+
+    // Different number of keys triggers re-render via shallowEqual
+    expect(result.current).toEqual({ bio: "Engineer", location: "NYC" });
+  });
+
+  test("selector with shallow-equal object result avoids re-render", () => {
+    const state = createTestState();
+    const subject = new DeepSubject(state);
+    let renderCount = 0;
+
+    const { result } = renderHook(() => {
+      renderCount++;
+      return useDeepSubjectSelector(subject, "user/profile", (profile) => ({
+        bio: profile.bio,
+        location: profile.location,
+      }));
+    });
+
+    expect(result.current).toEqual({ bio: "Developer", location: "NYC" });
+    const countAfterInit = renderCount;
+
+    // Update location to same value — selector returns shallow-equal object
+    act(() => {
+      subject.getValue().user.profile.location = "NYC";
+    });
+
+    // Should not have caused an extra render because shallowEqual returns true
+    expect(renderCount).toBe(countAfterInit);
   });
 });

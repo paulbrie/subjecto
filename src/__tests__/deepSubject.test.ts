@@ -1,4 +1,4 @@
-import { DeepSubject, matchPath } from '../deepSubject';
+import { DeepSubject, matchPath, batch } from '../deepSubject';
 
 beforeAll(() => {
     jest.spyOn(console, 'error').mockImplementation(() => { });
@@ -663,4 +663,87 @@ describe('DeepSubject LRU cache eviction', () => {
         ds.getValue().prop104.nested = 888;
         expect(subscribers[104]).toHaveBeenCalledWith(888);
     });
-}); 
+
+    it('complete() removes all subscribers', () => {
+        const subject = new DeepSubject({ user: { name: 'John', age: 30 } });
+        const cb1 = jest.fn();
+        const cb2 = jest.fn();
+        subject.subscribe('user/name', cb1);
+        subject.subscribe('user/age', cb2);
+
+        cb1.mockClear();
+        cb2.mockClear();
+
+        subject.complete();
+
+        subject.getValue().user.name = 'Jane';
+        subject.getValue().user.age = 31;
+
+        expect(cb1).not.toHaveBeenCalled();
+        expect(cb2).not.toHaveBeenCalled();
+    });
+});
+
+describe('batch', () => {
+    it('coalesces multiple mutations into a single notification per path', () => {
+        const subject = new DeepSubject({ user: { name: 'John', age: 30 } });
+        const nameCb = jest.fn();
+        const ageCb = jest.fn();
+        subject.subscribe('user/name', nameCb);
+        subject.subscribe('user/age', ageCb);
+
+        nameCb.mockClear();
+        ageCb.mockClear();
+
+        batch(() => {
+            subject.getValue().user.name = 'Jane';
+            subject.getValue().user.age = 31;
+        });
+
+        expect(nameCb).toHaveBeenCalledTimes(1);
+        expect(nameCb).toHaveBeenCalledWith('Jane');
+        expect(ageCb).toHaveBeenCalledTimes(1);
+        expect(ageCb).toHaveBeenCalledWith(31);
+    });
+
+    it('deduplicates same path within a batch', () => {
+        const subject = new DeepSubject({ count: 0 });
+        const cb = jest.fn();
+        subject.subscribe('count', cb);
+        cb.mockClear();
+
+        batch(() => {
+            subject.getValue().count = 1;
+            subject.getValue().count = 2;
+            subject.getValue().count = 3;
+        });
+
+        // Only notified once because same path is deduplicated
+        expect(cb).toHaveBeenCalledTimes(1);
+        expect(cb).toHaveBeenCalledWith(3); // notify fires after batch with final value
+    });
+
+    it('supports nested batches — flushes only on outermost', () => {
+        const subject = new DeepSubject({ a: 1, b: 2 });
+        const aCb = jest.fn();
+        const bCb = jest.fn();
+        subject.subscribe('a', aCb);
+        subject.subscribe('b', bCb);
+        aCb.mockClear();
+        bCb.mockClear();
+
+        batch(() => {
+            subject.getValue().a = 10;
+            batch(() => {
+                subject.getValue().b = 20;
+            });
+            // inner batch completes but outer is still open — no flush yet
+            expect(aCb).not.toHaveBeenCalled();
+            expect(bCb).not.toHaveBeenCalled();
+        });
+
+        // Now both fire
+        expect(aCb).toHaveBeenCalledTimes(1);
+        expect(bCb).toHaveBeenCalledTimes(1);
+    });
+});

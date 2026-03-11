@@ -16,6 +16,39 @@ const DEFAULT_NAME = 'noName'
 const DEFAULT_UPDATE_IF_STRICTLY_EQUAL = true
 const DEV = process.env.NODE_ENV !== 'production'
 
+// Module-level batching state
+let batchDepth = 0;
+const pendingBySubject = new Map<DeepSubject<DeepValue>, Set<string>>();
+const pendingNotify: Array<() => void> = [];
+
+/**
+ * Batch multiple mutations into a single notification cycle.
+ * Subscribers are notified once per unique path after the batch completes.
+ *
+ * @example
+ * ```typescript
+ * batch(() => {
+ *   state.getValue().user.name = 'Bob';
+ *   state.getValue().user.age = 31;
+ * }); // subscribers notified once
+ * ```
+ */
+export function batch(fn: () => void): void {
+    batchDepth++;
+    try {
+        fn();
+    } finally {
+        batchDepth--;
+        if (batchDepth === 0) {
+            const fns = pendingNotify.splice(0);
+            pendingBySubject.clear();
+            for (const notify of fns) {
+                notify();
+            }
+        }
+    }
+}
+
 // Optimized path matching with memoization for common patterns
 const matchCache = new Map<string, boolean>()
 const CACHE_SIZE_LIMIT = 100
@@ -90,6 +123,25 @@ function matchPathRecursive(pattern: string, path: string): boolean {
 
 export { matchPath };
 
+/** Call each subscriber in a set, catching errors in dev mode. */
+function callSubscribers(subs: Set<DeepSubjectSubscription>, value: unknown) {
+    subs.forEach((subscriber) => {
+        try {
+            subscriber(value);
+        } catch (error) {
+            if (DEV) {
+                console.error('Error in subscriber:', error);
+            }
+        }
+    });
+}
+
+/**
+ * Proxy-based deep observation subject.
+ *
+ * Circular references are safe — the internal proxy cache (WeakMap) ensures
+ * that the same object is never wrapped twice, preventing infinite recursion.
+ */
 export class DeepSubject<T extends DeepValue> {
     private value: T;
     private subscribers: Map<Path, Set<DeepSubjectSubscription>>;
@@ -186,32 +238,59 @@ export class DeepSubject<T extends DeepValue> {
     }
 
     private notifySubscribers(path: string) {
-        const notifySet = (subs: Set<DeepSubjectSubscription>, value: unknown) => {
-            subs.forEach((subscriber) => {
-                try {
-                    subscriber(value);
-                } catch (error) {
-                    if (DEV) {
-                        console.error('Error in subscriber:', error);
-                    }
-                }
-            });
+        if (batchDepth > 0) {
+            // Deduplicate by subject + path using identity-keyed Map
+            let paths = pendingBySubject.get(this as unknown as DeepSubject<DeepValue>);
+            if (!paths) {
+                paths = new Set();
+                pendingBySubject.set(this as unknown as DeepSubject<DeepValue>, paths);
+            }
+            if (!paths.has(path)) {
+                paths.add(path);
+                pendingNotify.push(() => this.executeNotify(path));
+            }
+            return;
         }
+        this.executeNotify(path);
+    }
+
+    private executeNotify(path: string) {
+        const notifiedPatterns = new Set<string>();
 
         // Notify exact path subscribers
         const subscribers = this.subscribers.get(path);
         if (subscribers) {
+            notifiedPatterns.add(path);
             const value = this.getValueAtPath(path);
-            notifySet(subscribers, value)
+            callSubscribers(subscribers, value)
         }
 
-        // Notify wildcard subscribers
+        // Notify ancestor path subscribers (e.g. "user" when "user/name" changes)
+        // Build ancestor paths incrementally to avoid repeated slice+join allocations
+        const parts = path.split('/');
+        if (parts.length > 1) {
+            let ancestorPath = parts[0];
+            for (let i = 1; i < parts.length; i++) {
+                if (!notifiedPatterns.has(ancestorPath)) {
+                    const ancestorSubs = this.subscribers.get(ancestorPath);
+                    if (ancestorSubs) {
+                        notifiedPatterns.add(ancestorPath);
+                        callSubscribers(ancestorSubs, this.getValueAtPath(ancestorPath));
+                    }
+                }
+                ancestorPath += '/' + parts[i];
+            }
+        }
+
+        // Notify wildcard and pattern subscribers
         for (const [pattern, subs] of Array.from(this.subscribers.entries())) {
-            if (pattern === path) continue
+            if (notifiedPatterns.has(pattern)) continue;
 
             if (pattern === '**') {
-                notifySet(subs, this.value)
+                notifiedPatterns.add(pattern);
+                callSubscribers(subs, this.value)
             } else if (matchPath(pattern, path)) {
+                notifiedPatterns.add(pattern);
                 const patternParts = pattern.split('/');
                 let value: DeepValue | undefined;
 
@@ -227,7 +306,7 @@ export class DeepSubject<T extends DeepValue> {
                 }
 
                 if (value !== undefined) {
-                    notifySet(subs, value)
+                    callSubscribers(subs, value)
                 }
             }
         }
@@ -283,6 +362,13 @@ export class DeepSubject<T extends DeepValue> {
         };
     }
 
+    /**
+     * Unsubscribes all subscribers.
+     */
+    complete() {
+        this.subscribers.clear();
+    }
+
     getValue(): T {
         return this.value;
     }
@@ -298,15 +384,7 @@ export class DeepSubject<T extends DeepValue> {
         for (const [pattern, subscribers] of Array.from(this.subscribers.entries())) {
             const value = this.getValueAtPath(pattern);
             if (value !== undefined) {
-                subscribers.forEach((subscriber: DeepSubjectSubscription) => {
-                    try {
-                        subscriber(value);
-                    } catch (error) {
-                        if (DEV) {
-                            console.error('Error in subscriber:', error);
-                        }
-                    }
-                });
+                callSubscribers(subscribers, value);
             }
         }
 
