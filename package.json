@@ -1,6 +1,6 @@
 {
   "name": "subjecto",
-  "version": "0.0.63",
+  "version": "0.0.64",
   "description": "A minimalistic state management library with tiny bundle size (0.6KB core, 1.8KB full)",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

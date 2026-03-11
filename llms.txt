@@ -90,7 +90,7 @@ const handle = state.subscribe('user/name', (name) => console.log(name))
 // Mutate through proxy — triggers subscribers automatically
 state.getValue().user.name = 'Bob'
 
-// Array mutations also trigger subscribers
+// Array mutations trigger subscribers and produce a new array reference (React-compatible)
 state.getValue().cart.items.push({ id: 1, price: 10 })
 
 // Unsubscribe
@@ -320,6 +320,8 @@ Use { skipInitialCall: true } if you don't want this (DeepSubject only).
 NOTE: Paths use forward slashes, not dots: "user/name" not "user.name"
 
 NOTE: Circular references in DeepSubject are safe (proxy cache prevents infinite recursion).
+
+NOTE: DeepSubject array methods (push, pop, splice, sort, reverse, shift, unshift) produce a new array reference after mutation. This ensures React deps (useMemo, useEffect) and Object.is comparisons detect changes correctly.
 
 ## Optional: llms-full.txt
 

@@ -574,6 +574,7 @@ Subscribe to changes at a specific path or pattern. By default, the subscriber i
 
 - Array index subscriptions (e.g., `"cart/items/0"`) are not supported. Subscribe to the array itself (`"cart/items"`) or use wildcard patterns (`"cart/**"`) instead
 - Subscribing to a parent path (e.g., `"user"`) will automatically receive notifications when any descendant changes (e.g., `"user/name"`, `"user/profile/bio"`)
+- Array mutation methods (`push`, `pop`, `shift`, `unshift`, `splice`, `sort`, `reverse`) produce a **new array reference**, making them fully compatible with React's `useMemo` deps, `useEffect` deps, and reference equality checks
 
 **Example:**
 
@@ -1323,6 +1324,27 @@ For most applications, performance is excellent out of the box. For demanding us
 - Importing React hooks from `subjecto/react` separately to avoid bundling them in non-React code
 
 ## Migration Guide
+
+### From v0.0.63 to v0.0.64+ (React compatibility fix)
+
+**No breaking changes.** DeepSubject array mutation methods now produce new array references.
+
+Previously, calling `push`, `pop`, `splice`, `sort`, `reverse`, `shift`, or `unshift` on a DeepSubject array mutated the array in-place (same reference). This meant React's `useMemo` deps, `useEffect` deps, and `Object.is` comparisons could not detect the change.
+
+Now, these methods automatically replace the array with a shallow copy after mutation, creating a new reference while preserving the correct return value (e.g., `push` still returns the new length, `pop` still returns the removed element).
+
+```typescript
+const state = new DeepSubject({ items: [1, 2, 3] });
+const refBefore = state.getValue().items;
+
+state.getValue().items.push(4);
+
+const refAfter = state.getValue().items;
+refAfter // [1, 2, 3, 4]
+refBefore !== refAfter // true — new reference
+```
+
+---
 
 ### From v0.0.61 to v0.0.62+ (React API improvements)
 

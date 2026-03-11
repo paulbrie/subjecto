@@ -69,6 +69,35 @@ describe('DeepSubject', () => {
         expect(callback).toHaveBeenCalledWith([1, 2, 3, 4]);
     });
 
+    it('should create a new array reference on push (React compat)', () => {
+        const subject = new DeepSubject({ items: [1, 2, 3] });
+        const refBefore = subject.getValue().items;
+        subject.getValue().items.push(4);
+        const refAfter = subject.getValue().items;
+        expect(refAfter).toEqual([1, 2, 3, 4]);
+        expect(refAfter).not.toBe(refBefore);
+    });
+
+    it('should create a new array reference on pop (React compat)', () => {
+        const subject = new DeepSubject({ items: [1, 2, 3] });
+        const refBefore = subject.getValue().items;
+        const popped = subject.getValue().items.pop();
+        const refAfter = subject.getValue().items;
+        expect(popped).toBe(3);
+        expect(refAfter).toEqual([1, 2]);
+        expect(refAfter).not.toBe(refBefore);
+    });
+
+    it('should create a new array reference on splice (React compat)', () => {
+        const subject = new DeepSubject({ items: [1, 2, 3, 4] });
+        const refBefore = subject.getValue().items;
+        const removed = subject.getValue().items.splice(1, 2);
+        const refAfter = subject.getValue().items;
+        expect(removed).toEqual([2, 3]);
+        expect(refAfter).toEqual([1, 4]);
+        expect(refAfter).not.toBe(refBefore);
+    });
+
     it('should handle array element changes', () => {
         const subject = new DeepSubject({ items: [1, 2, 3] });
         const callback = jest.fn();

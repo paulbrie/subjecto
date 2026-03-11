@@ -214,8 +214,20 @@ export class DeepSubject<T extends DeepValue> {
                     'push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'
                 ].includes(prop)) {
                     return (...args: unknown[]): unknown => {
+                        // Apply mutation to original array to get correct return value
                         const result = (value as (...args: unknown[]) => unknown).apply(target, args);
-                        this.notifySubscribers(parentPath);
+
+                        // Replace with a new array reference so React deps detect the change.
+                        // The assignment goes through the proxy set trap, which handles notification.
+                        const copy = [...target];
+                        const pathParts = parentPath.split('/');
+                        const key = pathParts[pathParts.length - 1];
+                        let parent: unknown = this.value;
+                        for (let i = 0; i < pathParts.length - 1; i++) {
+                            parent = (parent as Record<string, unknown>)[pathParts[i]];
+                        }
+                        (parent as Record<string, unknown>)[key] = copy;
+
                         return result;
                     };
                 }
