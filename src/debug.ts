@@ -67,7 +67,6 @@ export function debugSubject<T>(
         maxHistory = 50,
         darkMode = false,
         title = subject.options.name || 'Subject Debug',
-        editable = true,
         collapsible = true,
     } = options
 
@@ -75,7 +74,6 @@ export function debugSubject<T>(
     let isPaused = false
     let viewMode: 'list' | 'graph' = 'graph' // Default to graph view
     let timeWindow: 30 | 60 | 180 = 30 // seconds
-    let hoveredPoint: { x: number; y: number; value: unknown; entry: HistoryEntry } | null = null
     let graphDataPoints: Array<{ screenX: number; screenY: number; value: number; entry: HistoryEntry }> = []
 
     // Create UI structure
