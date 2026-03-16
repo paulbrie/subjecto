@@ -1567,9 +1567,11 @@ function CartSummary() {
 ```
 
 **Features:**
+- **SSR/hydration safe**: Uses a stable `getServerSnapshot` so `useSyncExternalStore` never sees an undefined or inconsistent snapshot
 - Memoized: only recomputes when the input value changes
 - Defaults to **shallow equality** for comparing selector results (handles objects/arrays correctly)
 - Accepts an optional `isEqual` function for custom comparison logic
+- Selector may receive `undefined` if the path does not exist; if the selector throws on an update, the previous result is kept (no snapshot inconsistency)
 - Result type is inferred from the selector return type
 
 ---

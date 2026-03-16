@@ -216,6 +216,8 @@ const count = useDeepSubjectSelector(
 )
 ```
 
+NOTE: useDeepSubjectSelector uses a stable getServerSnapshot for useSyncExternalStore (SSR/hydration safe). The selector may receive undefined if the path does not exist; if the selector throws on an update, the previous result is kept.
+
 ### React type utilities
 
 ```typescript
@@ -344,6 +346,8 @@ NOTE: Circular references in DeepSubject are safe (proxy cache prevents infinite
 NOTE: DeepSubject array methods (push, pop, splice, sort, reverse, shift, unshift) produce a new array reference after mutation. This ensures React deps (useMemo, useEffect) and Object.is comparisons detect changes correctly.
 
 NOTE: DeepSubject.next() replaces the root value and re-wraps it in a proxy, so mutations after next() (e.g. getValue().foo = x) are still observed. Prefer mutating through getValue() for incremental updates.
+
+NOTE: useDeepSubjectSelector is SSR-safe (stable server snapshot). Selector receives undefined when path is missing; if selector throws during an update, the hook keeps the previous result so useSyncExternalStore stays consistent.
 
 ## Optional: llms-full.txt
 

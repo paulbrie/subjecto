@@ -120,6 +120,19 @@ export function useDeepSubject<
  * @param isEqual - Optional equality function (defaults to shallow equality)
  * @returns The selected value
  */
+function computeInitialSelectorResult<T extends object, P extends Paths<T>, R>(
+    subject: DeepSubject<T>,
+    path: P,
+    selector: (value: PathValue<T, P>) => R,
+): { result: R; version: number } {
+    const value = getValueAtPath(subject, path);
+    try {
+        return { result: selector(value as PathValue<T, P>), version: 0 };
+    } catch {
+        return { result: undefined as R, version: 0 };
+    }
+}
+
 export function useDeepSubjectSelector<
     T extends object,
     P extends Paths<T>,
@@ -136,16 +149,25 @@ export function useDeepSubjectSelector<
     const isEqualRef = useRef(isEqual);
     isEqualRef.current = isEqual;
 
-    const storeRef = useRef<{ result: R; version: number }>({
-        result: selector(getValueAtPath(subject, path) as PathValue<T, P>),
-        version: 0,
-    });
+    // Stable initial snapshot for getServerSnapshot (SSR / hydration). useSyncExternalStore
+    // requires a consistent server snapshot; using the same ref for initial client state
+    // avoids undefined or mismatched snapshots.
+    const initialSnapshotRef = useRef<{ result: R; version: number } | null>(null);
+    if (initialSnapshotRef.current === null) {
+        initialSnapshotRef.current = computeInitialSelectorResult(subject, path, selector);
+    }
+    const storeRef = useRef<{ result: R; version: number }>(initialSnapshotRef.current);
 
     const subscribe = useCallback((onStoreChange: () => void) => {
         const onChange = () => {
             const value = getValueAtPath(subject, path);
-            const newResult = selectorRef.current(value as PathValue<T, P>);
-
+            let newResult: R;
+            try {
+                newResult = selectorRef.current(value as PathValue<T, P>);
+            } catch {
+                // Keep previous snapshot when selector throws (useSyncExternalStore stays consistent)
+                return;
+            }
             if (!isEqualRef.current(storeRef.current.result, newResult)) {
                 storeRef.current = {
                     result: newResult,
@@ -161,7 +183,8 @@ export function useDeepSubjectSelector<
     }, [subject, path]);
 
     const getSnapshot = useCallback(() => storeRef.current, []);
+    const getServerSnapshot = useCallback(() => initialSnapshotRef.current!, []);
 
-    const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+    const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
     return snapshot.result;
 }
