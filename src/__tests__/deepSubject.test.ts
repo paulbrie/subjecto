@@ -414,6 +414,34 @@ describe('DeepSubject additional coverage', () => {
         expect(handler).toHaveBeenCalledWith(3);
     });
 
+    it('re-wraps value in proxy after next() so subsequent mutations are observed', () => {
+        const ds = new DeepSubject<{ count: number }>({ count: 0 });
+        const handler = jest.fn();
+        ds.subscribe('count', handler);
+        handler.mockClear();
+        ds.next({ count: 1 });
+        expect(handler).toHaveBeenCalledWith(1);
+        handler.mockClear();
+        ds.getValue().count = 2;
+        expect(handler).toHaveBeenCalledWith(2);
+    });
+
+    it('notifies subscribers when property is deleted via delete', () => {
+        const ds = new DeepSubject<{ agents: Record<string, number> }>({
+            agents: { a: 1, b: 2, c: 3 },
+        });
+        const onAgents = jest.fn();
+        const onB = jest.fn();
+        ds.subscribe('agents', onAgents);
+        ds.subscribe('agents/b', onB);
+        onAgents.mockClear();
+        onB.mockClear();
+        delete ds.getValue().agents['b'];
+        expect(onAgents).toHaveBeenCalled();
+        expect(onB).toHaveBeenCalledWith(undefined);
+        expect(ds.getValue().agents).toEqual({ a: 1, c: 3 });
+    });
+
     it('should getValueAtPath with empty path', () => {
         const ds = new DeepSubject<{ a: number }>({ a: 1 });
         expect(ds["getValueAtPath"]('')).toEqual(ds.getValue());

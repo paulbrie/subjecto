@@ -192,6 +192,12 @@ export class DeepSubject<T extends DeepValue> {
                 target[prop as keyof T] = proxiedValue as T[keyof T];
                 this.notifySubscribers(prop.toString());
                 return true;
+            },
+            deleteProperty: (target: T, prop: string | symbol) => {
+                if (!(prop in target)) return true;
+                delete target[prop as keyof T];
+                this.notifySubscribers(prop.toString());
+                return true;
             }
         };
 
@@ -239,6 +245,12 @@ export class DeepSubject<T extends DeepValue> {
                     proxiedValue = this.createProxy(value, `${parentPath}/${prop.toString()}`);
                 }
                 target[prop as keyof typeof target] = proxiedValue as typeof target[keyof typeof target];
+                this.notifySubscribers(`${parentPath}/${prop.toString()}`);
+                return true;
+            },
+            deleteProperty: (target: object, prop: string | symbol) => {
+                if (!(prop in target)) return true;
+                delete target[prop as keyof typeof target];
                 this.notifySubscribers(`${parentPath}/${prop.toString()}`);
                 return true;
             }
@@ -385,6 +397,12 @@ export class DeepSubject<T extends DeepValue> {
         return this.value;
     }
 
+    /**
+     * Replace the entire value and notify subscribers.
+     * The new value is re-wrapped in a proxy so subsequent mutations (property sets,
+     * deletes, array splice/push etc.) remain observable. Prefer mutating via
+     * getValue() when possible so only affected paths notify.
+     */
     next(nextValue: T) {
         if (!this.options.updateIfStrictlyEqual && this.value === nextValue) {
             return;
@@ -392,6 +410,8 @@ export class DeepSubject<T extends DeepValue> {
 
         this.value = this.before(nextValue);
         this.count++;
+        this.proxyCache = new WeakMap();
+        this.setupProxy();
 
         for (const [pattern, subscribers] of Array.from(this.subscribers.entries())) {
             const value = this.getValueAtPath(pattern);

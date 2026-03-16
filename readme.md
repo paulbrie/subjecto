@@ -609,7 +609,7 @@ state.subscribe("**", (value) => {
 
 ##### `next(nextValue: T): void`
 
-Replace the entire state object and notify all subscribers.
+Replace the entire state object and notify all subscribers. The new value is **re-wrapped in a proxy**, so any subsequent mutations (e.g. `state.getValue().user.name = 'x'`) remain observable and trigger path subscriptions. Use `next()` for full replacements (e.g. load/hydrate); for incremental updates, prefer mutating through `getValue()` so only affected path subscribers run.
 
 **Parameters:**
 
@@ -621,6 +621,8 @@ Replace the entire state object and notify all subscribers.
 state.next({
   user: { name: "Jane", age: 25 },
 });
+// After next(), further mutations are still observed:
+state.getValue().user.age = 26; // Subscribers notified
 ```
 
 ##### `unsubscribe(subscriber: DeepSubjectSubscription): void`
@@ -654,7 +656,7 @@ state.complete(); // Removes all subscribers
 
 ##### `getValue(): T`
 
-Get the current state object. The returned object is proxied, so mutations will trigger subscriptions.
+Get the current state object. The returned object is proxied, so mutations (property set/delete, array `splice`/`push`/etc.) trigger path subscriptions automatically. **Prefer mutating through `getValue()`** for incremental updates instead of calling `next()` with a spread copy; only the affected paths notify.
 
 **Returns:** The current state object (proxied)
 
@@ -663,6 +665,8 @@ Get the current state object. The returned object is proxied, so mutations will 
 ```typescript
 const stateObj = state.getValue();
 stateObj.user.name = "Jane"; // Triggers subscriptions
+stateObj.tabs.splice(0, 1);  // Array mutation triggers subscriptions
+delete stateObj.agents[id];  // Delete triggers subscriptions
 ```
 
 #### Properties
@@ -1254,9 +1258,11 @@ This ensures you can't subscribe to paths that don't exist, catching typos at co
 
 6. **Prefer DeepSubject for Complex State**: Use DeepSubject when you have nested objects and need granular subscriptions
 
-7. **Use Wildcards Wisely**: Wildcard subscriptions can be powerful but may trigger more often than needed
+7. **Update DeepSubject via the proxy, not only via `next()`**: Mutate through `getValue()` (e.g. `state.getValue().user.name = 'x'`, `state.getValue().tabs.splice(i, 1)`, `delete state.getValue().agents[id]`) so the right path subscribers run. Use `next()` only when replacing the whole state (e.g. load/hydrate). After `next()`, the new value is re-wrapped in a proxy so further mutations are still observed.
 
-8. **Enable Debug Mode During Development**: Use `debug` property to track state changes (automatically stripped from production)
+8. **Use Wildcards Wisely**: Wildcard subscriptions can be powerful but may trigger more often than needed
+
+9. **Enable Debug Mode During Development**: Use `debug` property to track state changes (automatically stripped from production)
    ```typescript
    if (process.env.NODE_ENV === "development") {
      subject.debug = true;

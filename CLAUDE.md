@@ -32,7 +32,7 @@ The library ships 5 separate entry points for tree-shaking:
 
 - **`Subject<T>`** (`src/subject.ts`): Simple observable value. Subscribers notified on `next()`. Supports `before` transform, `debug` mode, `once`, `toggle`, `nextAssign`, `nextPush`. Uses `Symbol` keys for subscription IDs.
 
-- **`DeepSubject<T>`** (`src/deepSubject.ts`): Proxy-based deep observation. Subscribers use slash-separated path patterns (`"user/name"`, `"cart/items/**"`, `"*"`, `"**"`). Path matching supports exact, single-wildcard (`*`), and recursive-wildcard (`**`) with memoized matching. Array mutations (push, pop, splice, etc.) are intercepted via proxy.
+- **`DeepSubject<T>`** (`src/deepSubject.ts`): Proxy-based deep observation. Subscribers use slash-separated path patterns (`"user/name"`, `"cart/items/**"`, `"*"`, `"**"`). Path matching supports exact, single-wildcard (`*`), and recursive-wildcard (`**`) with memoized matching. Array mutations (push, pop, splice, etc.) are intercepted via proxy. **Prefer mutating through `getValue()`** (e.g. `s.getValue().user.name = x`, `s.getValue().tabs.splice()`, `delete s.getValue().agents[id]`) for incremental updates; use `next()` only for full state replacement. After `next()`, the value is re-wrapped in a proxy so subsequent mutations are still observed.
 
 ### React integration (`src/react/`)
 

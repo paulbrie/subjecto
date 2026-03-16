@@ -114,10 +114,17 @@ state.complete()
 ```typescript
 state.subscribe(pattern: string, cb: (v: unknown) => void, opts?): handle
 state.getValue(): T                  // Returns proxied object — mutations trigger subscriptions
-state.next(newValue: T): void        // Replace entire state
+state.next(newValue: T): void        // Replace entire state; re-wraps in proxy so mutations after next() are observed
 state.complete(): void               // Remove all subscribers
 state.unsubscribe(cb): void          // Remove a specific callback from all patterns
 ```
+
+### DeepSubject: how to update state
+
+- Prefer proxy-based mutations for incremental updates: mutate only what changed via getValue() so the right path subscribers run and only one notification cycle is needed.
+- Use .next() only when replacing the whole state (e.g. load/hydrate). After .next(), the new value is re-wrapped in a proxy, so further mutations (e.g. state.getValue().user.name = 'x') are observed.
+- Good: state.getValue().user.name = 'Bob'; state.getValue().tabs.splice(i, 1); state.getValue().activeId = id; delete state.getValue().agents[id].
+- Avoid: state.next({ ...state.getValue(), user: { ...state.getValue().user, name: 'Bob' } }) when you could do state.getValue().user.name = 'Bob'.
 
 ### Subscribe options
 
@@ -294,6 +301,19 @@ state.getValue().user.name = 'Bob'  // proxy intercepts — subscribers notified
 
 ---
 
+WRONG: Using .next() for every small change (replaces root; prefer proxy mutations for incremental updates)
+```tsx
+state.next({ ...state.getValue(), user: { ...state.getValue().user, name: 'Bob' } })
+```
+
+RIGHT: Mutate via getValue() so only affected path subscribers run
+```tsx
+state.getValue().user.name = 'Bob'
+// Or: state.getValue().tabs.splice(i, 1), delete state.getValue().agents[id], etc.
+```
+
+---
+
 WRONG: Subscribing to array indices
 ```tsx
 state.subscribe('cart/items/0', cb)  // does NOT work
@@ -322,6 +342,8 @@ NOTE: Paths use forward slashes, not dots: "user/name" not "user.name"
 NOTE: Circular references in DeepSubject are safe (proxy cache prevents infinite recursion).
 
 NOTE: DeepSubject array methods (push, pop, splice, sort, reverse, shift, unshift) produce a new array reference after mutation. This ensures React deps (useMemo, useEffect) and Object.is comparisons detect changes correctly.
+
+NOTE: DeepSubject.next() replaces the root value and re-wraps it in a proxy, so mutations after next() (e.g. getValue().foo = x) are still observed. Prefer mutating through getValue() for incremental updates.
 
 ## Optional: llms-full.txt
 
