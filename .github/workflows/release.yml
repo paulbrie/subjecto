@@ -1,0 +1,75 @@
+name: Release
+
+# Publish to npm when a version tag (v*) is pushed.
+#
+#   npm version patch          # bumps package.json + commits + creates the tag
+#   git push --follow-tags     # pushes the commit and the tag -> triggers this
+#
+# Auth uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret required.
+# One-time setup on npmjs.com: package "subjecto" -> Settings -> Trusted Publisher
+#   Provider:   GitHub Actions
+#   Repository: paulbrie/subjecto
+#   Workflow:   release.yml
+#   Environment: (leave blank, or "npm" if you add one below)
+# OIDC also produces a signed provenance attestation automatically.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the GitHub Release
+  id-token: write # npm Trusted Publishing (OIDC) + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          registry-url: "https://registry.npmjs.org"
+          cache: "npm"
+
+      # Trusted Publishing needs npm >= 11.5.1; the version bundled with Node is
+      # older, so upgrade the CLI before publishing.
+      - name: Upgrade npm (OIDC-capable)
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify tag matches package.json version
+        run: |
+          PKG_VERSION="v$(node -p "require('./package.json').version")"
+          if [ "$PKG_VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Check bundle sizes
+        run: npm run size
+
+      # No NODE_AUTH_TOKEN: npm exchanges the GitHub OIDC token for a short-lived
+      # npm credential. Provenance is generated automatically under OIDC.
+      - name: Publish to npm (Trusted Publishing)
+        run: npm publish --access public
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
