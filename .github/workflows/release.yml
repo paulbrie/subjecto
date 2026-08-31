@@ -75,21 +75,27 @@ jobs:
           echo "npm:  $(npm -v)  ($(command -v npm))"
           echo "node: $(node -v)"
           echo "registry: $(npm config get registry)"
-          if [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
-            echo "OIDC request URL:   present"
-          else
-            echo "OIDC request URL:   MISSING (id-token permission not effective)"
-          fi
-          if [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
-            echo "OIDC request token: present"
-          else
-            echo "OIDC request token: MISSING"
-          fi
+          echo "OIDC url: ${ACTIONS_ID_TOKEN_REQUEST_URL:+present}${ACTIONS_ID_TOKEN_REQUEST_URL:-MISSING}"
+          echo "NPM_CONFIG_USERCONFIG=${NPM_CONFIG_USERCONFIG:-<unset>}"
+          echo "--- auth-related npm config ---"
+          npm config ls -l 2>/dev/null | grep -iE "_authToken|always-auth|//registry" || echo "(no token lines in npm config)"
+          for f in ./.npmrc "$HOME/.npmrc" "$NPM_CONFIG_USERCONFIG"; do
+            if [ -n "$f" ] && [ -f "$f" ]; then
+              echo "--- contents of $f ---"
+              sed -E 's/(_authToken=).*/\1<redacted>/' "$f"
+            fi
+          done
 
       # No NODE_AUTH_TOKEN: npm exchanges the GitHub OIDC token for a short-lived
       # npm credential. Provenance is generated automatically under OIDC.
       - name: Publish to npm (Trusted Publishing)
-        run: npm publish --access public
+        run: npm publish --access public --loglevel verbose
+
+      - name: npm debug log (on failure)
+        if: failure()
+        run: |
+          echo "===== npm debug log ====="
+          tail -n 120 "$HOME"/.npm/_logs/*-debug-0.log 2>/dev/null || echo "(no debug log)"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
