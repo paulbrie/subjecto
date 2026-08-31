@@ -29,11 +29,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # NOTE: do NOT set `registry-url` here. It makes setup-node write an
+      # .npmrc with `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`; with
+      # no token that value is empty, npm treats it as a (failed) token login and
+      # never attempts the OIDC exchange -> E404 on publish. Without it, npm
+      # publishes to the default registry (npmjs.org) via Trusted Publishing.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
-          registry-url: "https://registry.npmjs.org"
           cache: "npm"
 
       # Trusted Publishing needs npm >= 11.5.1; the version bundled with Node is
