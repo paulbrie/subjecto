@@ -56,7 +56,12 @@ const CACHE_SIZE_LIMIT = 100
 function matchPath(pattern: string, path: string): boolean {
     const cacheKey = `${pattern}:${path}`
     const cached = matchCache.get(cacheKey)
-    if (cached !== undefined) return cached
+    if (cached !== undefined) {
+        // Touch on hit: move the key to the end so eviction is true LRU.
+        matchCache.delete(cacheKey)
+        matchCache.set(cacheKey, cached)
+        return cached
+    }
 
     let result: boolean
 
@@ -336,6 +341,26 @@ export class DeepSubject<T extends DeepValue> {
         }
     }
 
+    /**
+     * Resolve the value a pattern subscriber should receive on a full-tree
+     * replacement (`next()`). Wildcard patterns (`**`, `foo/**`, `foo/*`) don't
+     * resolve through getValueAtPath (there is no literal `**` key), so we walk
+     * down to the concrete prefix before the first wildcard segment:
+     *   `**`            -> the whole value
+     *   `user/name/**`  -> value at `user/name`   (the useDeepSubject pattern)
+     *   `items/*`       -> value at `items`
+     *   `user/name`     -> value at `user/name`   (unchanged for exact paths)
+     */
+    private getValueForPattern(pattern: string): DeepValue | undefined {
+        if (pattern === '**') return this.value;
+        const concrete: string[] = [];
+        for (const part of pattern.split('/')) {
+            if (part === '*' || part === '**') break;
+            concrete.push(part);
+        }
+        return this.getValueAtPath(concrete.join('/'));
+    }
+
     private getValueAtPath(path: string): DeepValue | undefined {
         if (path === '') return this.value
 
@@ -414,18 +439,20 @@ export class DeepSubject<T extends DeepValue> {
         this.setupProxy();
 
         for (const [pattern, subscribers] of Array.from(this.subscribers.entries())) {
-            const value = this.getValueAtPath(pattern);
+            const value = this.getValueForPattern(pattern);
             if (value !== undefined) {
                 callSubscribers(subscribers, value);
             }
         }
 
         if (DEV && this.debug) {
+            // Report the applied value (post-`before`) so debug output matches
+            // what subscribers actually received.
             if (typeof this.debug === "function") {
-                this.debug(nextValue);
+                this.debug(this.value);
             } else {
                 console.log(`\n--- SUBJECTO DEBUG: \`${this.options.name}\` ---`);
-                console.log(` ├ nextValue:`, nextValue);
+                console.log(` ├ nextValue:`, this.value);
                 console.log(` └ subscribers(${this.subscribers.size}): `, this, "\n");
             }
         }

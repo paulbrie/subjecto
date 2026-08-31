@@ -804,3 +804,38 @@ describe('batch', () => {
         expect(bCb).toHaveBeenCalledTimes(1);
     });
 });
+describe('DeepSubject next() notifies wildcard subscribers (regression)', () => {
+    it('notifies ** subscribers on full replacement via next()', () => {
+        const ds = new DeepSubject<{ user: { name: string } }>({ user: { name: 'a' } });
+        const handler = jest.fn();
+        ds.subscribe('**', handler, { skipInitialCall: true });
+        ds.next({ user: { name: 'b' } });
+        expect(handler).toHaveBeenCalledTimes(1);
+        expect(handler).toHaveBeenCalledWith({ user: { name: 'b' } });
+    });
+
+    it('notifies path/** subscribers (the useDeepSubject pattern) on next()', () => {
+        const ds = new DeepSubject<{ user: { name: string } }>({ user: { name: 'a' } });
+        const handler = jest.fn();
+        ds.subscribe('user/**', handler, { skipInitialCall: true });
+        ds.next({ user: { name: 'b' } });
+        expect(handler).toHaveBeenCalledTimes(1);
+        expect(handler).toHaveBeenCalledWith({ name: 'b' });
+    });
+
+    it('notifies single-* subscribers on next()', () => {
+        const ds = new DeepSubject<{ user: { name: string } }>({ user: { name: 'a' } });
+        const handler = jest.fn();
+        ds.subscribe('user/*', handler, { skipInitialCall: true });
+        ds.next({ user: { name: 'b' } });
+        expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    it('still notifies exact-path subscribers on next()', () => {
+        const ds = new DeepSubject<{ user: { name: string } }>({ user: { name: 'a' } });
+        const handler = jest.fn();
+        ds.subscribe('user/name', handler, { skipInitialCall: true });
+        ds.next({ user: { name: 'b' } });
+        expect(handler).toHaveBeenCalledWith('b');
+    });
+});

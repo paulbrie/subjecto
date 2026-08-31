@@ -626,3 +626,13 @@ describe("useDeepSubjectSelector", () => {
     expect(renderCount).toBe(countAfterInit);
   });
 });
+
+describe('useDeepSubject + DeepSubject.next() (regression: wildcard notify)', () => {
+  test('re-renders when the whole state is replaced via next()', () => {
+    const subject = new DeepSubject<{ user: { name: string } }>({ user: { name: 'a' } });
+    const { result } = renderHook(() => useDeepSubject(subject, 'user/name'));
+    expect(result.current[0]).toBe('a');
+    act(() => { subject.next({ user: { name: 'b' } }); });
+    expect(result.current[0]).toBe('b');
+  });
+});
