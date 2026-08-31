@@ -1,0 +1,24 @@
+[
+  {
+    "name": "core (Subject only)",
+    "path": "dist/core.js",
+    "import": "{ Subject }",
+    "limit": "1 KB"
+  },
+  {
+    "name": "full (Subject + DeepSubject + helpers)",
+    "path": "dist/index.js",
+    "limit": "3 KB"
+  },
+  {
+    "name": "helpers",
+    "path": "dist/helpers.js",
+    "limit": "1 KB"
+  },
+  {
+    "name": "react hooks",
+    "path": "dist/react/index.js",
+    "import": "{ useSubject, useDeepSubject, useDeepSubjectSelector }",
+    "limit": "2 KB"
+  }
+]
