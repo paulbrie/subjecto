@@ -52,7 +52,7 @@ subject.complete(): void                         // Remove all subscribers
 subject.nextAssign(partial: Partial<T>): void    // Object.assign merge (throws if not object)
 subject.nextPush(item: unknown): void            // Array push (throws if not array)
 subject.toggle(): void                           // Flip boolean (throws if not boolean)
-subject.once(cb: (v: T) => void): void           // Subscribe once, auto-unsubscribe after first call
+subject.once(cb: (v: T) => void): void           // Fires synchronously with the CURRENT value, then auto-unsubscribes (does not wait for a future next())
 ```
 
 ### Subject properties
@@ -252,7 +252,7 @@ const flag = new Subject(false)
 toggle(flag)                // true
 
 const s = new Subject(0)
-once(s, (v) => console.log(v))  // fires once, then auto-unsubscribes
+once(s, (v) => console.log(v))  // fires once with the current value, then auto-unsubscribes
 
 complete(s)                 // removes all subscribers
 ```
