@@ -70,7 +70,9 @@ export function toggle(subject: Subject<boolean>): void {
 
 /**
  * Subscribe once helper.
- * Subscribes to the next value change only, then automatically unsubscribes.
+ * Calls the callback a single time with the subject's current value, then
+ * automatically unsubscribes (even if the callback throws). It does not wait
+ * for a future change — it fires synchronously, like a one-shot `subscribe`.
  *
  * @param subject - The subject to subscribe to
  * @param callback - Callback function to call once
@@ -81,7 +83,7 @@ export function toggle(subject: Subject<boolean>): void {
  *
  * const subject = new Subject(0)
  * once(subject, (value) => {
- *   console.log('This will only be called once:', value)
+ *   console.log('Called once with the current value:', value) // 0
  * })
  * ```
  */

@@ -91,13 +91,18 @@ export class Subject<T> {
     }
 
     /**
-     * A subscription that is called once, then unsubscribed automatically.
+     * A subscription that is called once with the current value, then
+     * unsubscribed automatically. The unsubscription happens even if the
+     * callback throws, so a throwing callback can never fire twice.
      */
     once(subscription: SubjectSubscription<T>): void {
         const id = Symbol('subscriber-once')
         this.subscribers.set(id, (value: T) => {
-            subscription(value)
-            this.unsubscribe(id)
+            try {
+                subscription(value)
+            } finally {
+                this.unsubscribe(id)
+            }
         })
         const subscriber = this.subscribers.get(id)
         if (subscriber) {
@@ -142,11 +147,13 @@ export class Subject<T> {
         })
 
         if (DEV && this.debug) {
+            // Report the applied value (post-`before`) so debug output matches
+            // what subscribers actually received.
             if (typeof this.debug === "function") {
-                this.debug(nextValue)
+                this.debug(this.value)
             } else {
                 console.log(`\n--- SUBJECTO DEBUG: \`${this.options.name}\` ---`)
-                console.log(` ├ nextValue:`, nextValue)
+                console.log(` ├ nextValue:`, this.value)
                 console.log(` └ subscribers(${this.subscribers.size}): `, this, "\n")
             }
         }

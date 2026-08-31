@@ -348,13 +348,16 @@ subject.toggle(); // false
 
 ##### `once(subscription: SubjectSubscription<T>): void`
 
-Subscribe to the next value change only. The subscription is automatically removed after being called once.
+Calls the subscription **a single time with the current value**, then automatically
+unsubscribes (even if the callback throws). It fires **synchronously** — like a
+one-shot `subscribe` — and does **not** wait for a future `next()`.
 
 **Example:**
 
 ```typescript
+const subject = new Subject("hello");
 subject.once((value) => {
-  console.log("This will only be called once:", value);
+  console.log("Called once with the current value:", value); // "hello"
 });
 ```
 
@@ -484,14 +487,15 @@ toggle(subject) // false
 
 ##### `once<T>(subject: Subject<T>, callback: (value: T) => void)`
 
-Subscribe to the next value change only.
+Calls the callback once with the subject's **current** value, then auto-unsubscribes.
+Fires synchronously; it does not wait for a future change.
 
 ```typescript
 import { once } from 'subjecto/helpers'
 
 const subject = new Subject(0)
 once(subject, (value) => {
-  console.log('This will only be called once:', value)
+  console.log('Called once with the current value:', value) // 0
 })
 ```
 
@@ -921,24 +925,36 @@ age.next(25.7); // Sets to 25
 
 ### Example 7: One-time Subscriptions
 
+`once` fires **synchronously with the current value** and then auto-unsubscribes —
+it is a snapshot helper, not a "wait for the next event" helper:
+
 ```typescript
 import { Subject } from "subjecto";
 
+const status = new Subject<string>("ready");
+
+// Runs immediately with the current value ("ready"), then unsubscribes.
+status.once((value) => {
+  console.log("Snapshot of status:", value); // "ready"
+});
+status.next("busy"); // Does nothing — the once subscription already ran.
+```
+
+To instead **wait for a future change**, use `subscribe` and unsubscribe yourself
+once the condition is met (the first call is the current value, so guard for it):
+
+```typescript
 const dataLoaded = new Subject<boolean>(false);
 
-// Wait for data to load once
-dataLoaded.once((loaded) => {
+const handle = dataLoaded.subscribe((loaded) => {
   if (loaded) {
     console.log("Data loaded! Initializing app...");
     initializeApp();
+    handle.unsubscribe(); // stop after the first truthy value
   }
 });
 
-// Simulate async data loading
-fetchData().then(() => {
-  dataLoaded.next(true); // Triggers once subscription
-  dataLoaded.next(true); // Does nothing (subscription already removed)
-});
+fetchData().then(() => dataLoaded.next(true));
 ```
 
 ### Example 8: Using Built-in React Hooks

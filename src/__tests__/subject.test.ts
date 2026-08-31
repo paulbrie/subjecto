@@ -194,6 +194,21 @@ describe('unsubscribe', () => {
         expect(sub).toHaveBeenCalledTimes(1)
     })
 
+    test('once unsubscribes even when the callback throws (no leak / no double-fire)', () => {
+        jest.spyOn(console, 'error').mockImplementation(() => {})
+        const subject = new Subject('a')
+        const sub = jest.fn(() => { throw new Error('boom') })
+
+        subject.once(sub)
+        // The throwing immediate call must still remove the subscription.
+        expect(subject.subscribers.size).toBe(0)
+
+        // A later next() must not fire the once-callback again.
+        subject.next('b')
+        expect(sub).toHaveBeenCalledTimes(1)
+        ;(console.error as jest.Mock).mockRestore()
+    })
+
     test('complete', () => {
         const subject = new Subject('a')
         const sub = () => null
@@ -309,6 +324,18 @@ describe('Subject debug logging', () => {
         subject.next('newValue');
 
         expect(debugFn).toHaveBeenCalledWith('newValue');
+    });
+
+    test('debug function receives the applied value when a before transform is set', () => {
+        const subject = new Subject('a');
+        subject.before = (v: string) => v.toUpperCase();
+        const debugFn = jest.fn();
+        subject.debug = debugFn;
+        subject.next('b');
+
+        // Subscribers get 'B', so debug must report 'B' (not the raw 'b').
+        expect(debugFn).toHaveBeenCalledWith('B');
+        expect(subject.getValue()).toBe('B');
     });
 
     test('should log debug info on unsubscribe when debug is true', () => {
