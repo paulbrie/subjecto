@@ -1,11 +1,15 @@
 {
   "name": "subjecto",
-  "version": "0.0.66",
+  "version": "0.0.67",
   "description": "A minimalistic state management library with tiny bundle size (0.6KB core, 1.8KB full)",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "sideEffects": false,
+  "files": [
+    "dist",
+    "!dist/**/*.map"
+  ],
   "scripts": {
     "prepare": "husky && if [ -d 'dist' ]; then rm -rf dist && npm run build; fi",
     "watch": "tsup --watch",
@@ -13,7 +17,8 @@
     "build:old": "tsc -b ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json",
     "test": "jest",
     "lint": "eslint",
-    "size": "npm run build && size-limit"
+    "size": "npm run build && size-limit",
+    "prepublishOnly": "npm run build"
   },
   "exports": {
     ".": {
