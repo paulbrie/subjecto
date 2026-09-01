@@ -5,13 +5,19 @@ name: Release
 #   npm version patch          # bumps package.json + commits + creates the tag
 #   git push --follow-tags     # pushes the commit and the tag -> triggers this
 #
-# Auth uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret required.
-# One-time setup on npmjs.com: package "subjecto" -> Settings -> Trusted Publisher
+# Auth: an `NPM_TOKEN` repository secret (npmjs.com -> Access Tokens ->
+# Granular/Automation token with publish access) is used via NODE_AUTH_TOKEN.
+#
+# npm >= 11.5.1 also attempts OIDC Trusted Publishing automatically when
+# `id-token: write` is granted (see below), but that exchange fails silently
+# and falls back to classic auth if the registry doesn't have a Trusted
+# Publisher configured for this package/workflow yet -> ENEEDAUTH. Keeping
+# NPM_TOKEN configured guarantees publishing works either way; once Trusted
+# Publishing is configured on npmjs.com it will be used automatically instead.
 #   Provider:   GitHub Actions
 #   Repository: paulbrie/subjecto
 #   Workflow:   release.yml
 #   Environment: (leave blank, or "npm" if you add one below)
-# OIDC also produces a signed provenance attestation automatically.
 
 on:
   push:
@@ -29,16 +35,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # NOTE: do NOT set `registry-url` here. It makes setup-node write an
-      # .npmrc with `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`; with
-      # no token that value is empty, npm treats it as a (failed) token login and
-      # never attempts the OIDC exchange -> E404 on publish. Without it, npm
-      # publishes to the default registry (npmjs.org) via Trusted Publishing.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
           cache: "npm"
+          registry-url: "https://registry.npmjs.org"
 
       # Trusted Publishing needs npm >= 11.5.1; the version bundled with Node is
       # older, so upgrade the CLI before publishing.
@@ -68,10 +70,14 @@ jobs:
       - name: Check bundle sizes
         run: npm run size
 
-      # No NODE_AUTH_TOKEN: npm exchanges the GitHub OIDC token for a short-lived
-      # npm credential. Provenance is generated automatically under OIDC.
-      - name: Publish to npm (Trusted Publishing)
+      # NODE_AUTH_TOKEN comes from the NPM_TOKEN repository secret. If Trusted
+      # Publishing is configured on npmjs.com for this repo/workflow, npm's
+      # OIDC exchange takes precedence automatically; NPM_TOKEN is the
+      # guaranteed fallback so releases don't fail with ENEEDAUTH.
+      - name: Publish to npm
         run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
